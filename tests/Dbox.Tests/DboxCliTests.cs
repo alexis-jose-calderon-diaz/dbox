@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Dbox.Cli;
 
 namespace Dbox.Tests;
 
@@ -10,9 +11,9 @@ public sealed class DboxCliTests
         using var project = new TestProject();
 
         var firstInit = await TestProject.RunAsync(project.Root, "init");
-        var add = await TestProject.RunAsync(project.Root, "add", "--type", "implementation", "--title", "Keep me");
+        var add = await TestProject.RunAsync(project.Root, "activity", "add", "--type", "implementation", "--title", "Keep me");
         var secondInit = await TestProject.RunAsync(project.Root, "init");
-        var list = await TestProject.RunAsync(project.Root, "list", "--output", "json");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
 
         Assert.Equal(0, firstInit.ExitCode);
         Assert.Equal("Database initialized: .dbox/data.db\n", firstInit.Output);
@@ -31,10 +32,10 @@ public sealed class DboxCliTests
         var child = project.CreateChild();
 
         await TestProject.RunAsync(project.Root, "init");
-        await TestProject.RunAsync(project.Root, "add", "--type", "research", "--title", "Parent");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--type", "research", "--title", "Parent");
         var childInit = await TestProject.RunAsync(child, "init");
-        var childList = await TestProject.RunAsync(child, "list", "--output", "json");
-        var parentList = await TestProject.RunAsync(project.Root, "list", "--output", "json");
+        var childList = await TestProject.RunAsync(child, "activity", "list", "--output", "json");
+        var parentList = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
 
         Assert.Equal(0, childInit.ExitCode);
         Assert.Equal("[]\n", childList.Output);
@@ -48,8 +49,8 @@ public sealed class DboxCliTests
         var nested = project.CreateChild("src/feature");
 
         await TestProject.RunAsync(project.Root, "init");
-        await TestProject.RunAsync(project.Root, "add", "--type", "research", "--title", "Parent activity");
-        var result = await TestProject.RunAsync(nested, "list", "--output", "json");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--type", "research", "--title", "Parent activity");
+        var result = await TestProject.RunAsync(nested, "activity", "list", "--output", "json");
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Parent activity", result.Output);
@@ -63,7 +64,7 @@ public sealed class DboxCliTests
         Directory.CreateDirectory(Path.Combine(child, ".dbox"));
 
         await TestProject.RunAsync(project.Root, "init");
-        var result = await TestProject.RunAsync(child, "list");
+        var result = await TestProject.RunAsync(child, "activity", "list");
 
         Assert.Equal(4, result.ExitCode);
         Assert.Contains("No dbox database found.", result.Error);
@@ -76,10 +77,10 @@ public sealed class DboxCliTests
         using var project = new TestProject();
         await TestProject.RunAsync(project.Root, "init");
 
-        var schema = await TestProject.RunAsync(project.Root, "schema", "--json");
-        var alias = await TestProject.RunAsync(project.Root, "--schema", "--json");
-        var aliasWithGlobalOutput = await TestProject.RunAsync(project.Root, "--output=json", "--schema", "--json");
-        var humanSchema = await TestProject.RunAsync(project.Root, "schema");
+        var schema = await TestProject.RunAsync(project.Root, "activity", "schema", "--json");
+        var alias = await TestProject.RunAsync(project.Root, "activity", "--schema", "--json");
+        var aliasWithGlobalOutput = await TestProject.RunAsync(project.Root, "--output=json", "activity", "--schema", "--json");
+        var humanSchema = await TestProject.RunAsync(project.Root, "activity", "schema");
         using var document = JsonDocument.Parse(schema.Output);
         var fields = document.RootElement.GetProperty("entities").GetProperty("activity").GetProperty("fields");
 
@@ -101,6 +102,65 @@ public sealed class DboxCliTests
     }
 
     [Fact]
+    public async Task HelpExposesRootInfrastructureAndActivityCatalog()
+    {
+        using var project = new TestProject();
+
+        var rootHelp = await TestProject.RunAsync(project.Root, "--help");
+        var activityHelp = await TestProject.RunAsync(project.Root, "activity", "--help");
+
+        Assert.Equal(0, rootHelp.ExitCode);
+        Assert.Empty(rootHelp.Error);
+        Assert.Contains("init", rootHelp.Output);
+        Assert.Contains("activity", rootHelp.Output);
+        Assert.DoesNotContain("schema", rootHelp.Output);
+        Assert.DoesNotContain("add", rootHelp.Output);
+        Assert.Equal(0, activityHelp.ExitCode);
+        Assert.Empty(activityHelp.Error);
+        Assert.Contains("schema", activityHelp.Output);
+        Assert.Contains("add", activityHelp.Output);
+        Assert.Contains("list", activityHelp.Output);
+        Assert.Contains("get", activityHelp.Output);
+        Assert.Contains("update", activityHelp.Output);
+        Assert.Contains("delete", activityHelp.Output);
+    }
+
+    [Fact]
+    public async Task FlatActivityCommandsAndRootSchemaAliasAreRejected()
+    {
+        using var project = new TestProject();
+        var flatCommands = new[]
+        {
+            new[] { "schema" },
+            new[] { "add" },
+            new[] { "list" },
+            new[] { "get", "1" },
+            new[] { "update", "1" },
+            new[] { "delete", "1" }
+        };
+
+        foreach (var arguments in flatCommands)
+        {
+            var result = await TestProject.RunAsync(project.Root, arguments);
+
+            Assert.Equal(ExitCodes.ValidationError, result.ExitCode);
+            Assert.Empty(result.Output);
+            Assert.Contains("Validation error:", result.Error);
+        }
+
+        var rootSchemaAlias = await TestProject.RunAsync(project.Root, "--schema");
+        var rootSchemaAliasJson = await TestProject.RunAsync(project.Root, "--schema", "--json");
+
+        Assert.Equal(ExitCodes.ValidationError, rootSchemaAlias.ExitCode);
+        Assert.Equal(ExitCodes.ValidationError, rootSchemaAliasJson.ExitCode);
+        Assert.Empty(rootSchemaAlias.Output);
+        Assert.Empty(rootSchemaAliasJson.Output);
+        Assert.Contains("Validation error:", rootSchemaAlias.Error);
+        Assert.Contains("Validation error:", rootSchemaAliasJson.Error);
+        Assert.False(Directory.Exists(Path.Combine(project.Root, ".dbox")));
+    }
+
+    [Fact]
     public async Task CrudSupportsJsonFiltersPartialUpdatesAndDeletion()
     {
         using var project = new TestProject();
@@ -108,6 +168,7 @@ public sealed class DboxCliTests
 
         var firstAdd = await TestProject.RunAsync(
             project.Root,
+            "activity",
             "add",
             "--type",
             "research",
@@ -117,25 +178,28 @@ public sealed class DboxCliTests
             "json");
         var secondAdd = await TestProject.RunAsync(
             project.Root,
+            "activity",
             "add",
             "--json",
             "{\"type\":\"implementation\",\"title\":\"Build\",\"description\":\"Details\",\"status\":\"pending\"}",
             "--output",
             "json");
-        var list = await TestProject.RunAsync(project.Root, "list", "--output", "json");
-        var filteredList = await TestProject.RunAsync(project.Root, "list", "--type", "implementation", "--status", "pending", "--output", "json");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
+        var filteredList = await TestProject.RunAsync(project.Root, "activity", "list", "--type", "implementation", "--status", "pending", "--output", "json");
         var update = await TestProject.RunAsync(
             project.Root,
+            "activity",
             "update",
             "1",
             "--json",
             "{\"description\":null,\"status\":\"completed\"}",
             "--output",
             "json");
-        var get = await TestProject.RunAsync(project.Root, "get", "1", "--output", "json");
-        var emptyUpdate = await TestProject.RunAsync(project.Root, "update", "1", "--output", "json");
+        var get = await TestProject.RunAsync(project.Root, "activity", "get", "1", "--output", "json");
+        var emptyUpdate = await TestProject.RunAsync(project.Root, "activity", "update", "1", "--output", "json");
         var optionUpdate = await TestProject.RunAsync(
             project.Root,
+            "activity",
             "update",
             "2",
             "--status",
@@ -144,14 +208,15 @@ public sealed class DboxCliTests
             "json");
         var generatedUpdate = await TestProject.RunAsync(
             project.Root,
+            "activity",
             "update",
             "1",
             "--json",
             "{\"id\":99}",
             "--output",
             "json");
-        var deleted = await TestProject.RunAsync(project.Root, "delete", "1", "--output", "json");
-        var missing = await TestProject.RunAsync(project.Root, "get", "1", "--output", "json");
+        var deleted = await TestProject.RunAsync(project.Root, "activity", "delete", "1", "--output", "json");
+        var missing = await TestProject.RunAsync(project.Root, "activity", "get", "1", "--output", "json");
         using var listDocument = JsonDocument.Parse(list.Output);
         using var filteredDocument = JsonDocument.Parse(filteredList.Output);
         using var firstAddDocument = JsonDocument.Parse(firstAdd.Output);
@@ -194,6 +259,7 @@ public sealed class DboxCliTests
 
         var invalid = await TestProject.RunAsync(
             project.Root,
+            "activity",
             "add",
             "--type",
             "invalid",
@@ -201,7 +267,7 @@ public sealed class DboxCliTests
             "",
             "--output",
             "json");
-        var list = await TestProject.RunAsync(project.Root, "list", "--output", "json");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
 
         Assert.Equal(2, invalid.ExitCode);
         Assert.Empty(invalid.Output);
@@ -215,9 +281,9 @@ public sealed class DboxCliTests
         using var project = new TestProject();
         await TestProject.RunAsync(project.Root, "init");
 
-        var wrongCase = await TestProject.RunAsync(project.Root, "add", "--type", "Research", "--title", "Valid");
-        var tooLong = await TestProject.RunAsync(project.Root, "add", "--type", "research", "--title", new string('x', 201));
-        var list = await TestProject.RunAsync(project.Root, "list", "--output", "json");
+        var wrongCase = await TestProject.RunAsync(project.Root, "activity", "add", "--type", "Research", "--title", "Valid");
+        var tooLong = await TestProject.RunAsync(project.Root, "activity", "add", "--type", "research", "--title", new string('x', 201));
+        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
 
         Assert.Equal(2, wrongCase.ExitCode);
         Assert.Equal(2, tooLong.ExitCode);
@@ -232,7 +298,7 @@ public sealed class DboxCliTests
         using var project = new TestProject();
 
         var init = await TestProject.RunAsync(project.Root, "init", "--output", "json");
-        var list = await TestProject.RunAsync(project.Root, "list");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list");
         using var initDocument = JsonDocument.Parse(init.Output);
 
         Assert.Equal(0, init.ExitCode);
@@ -251,13 +317,13 @@ public sealed class DboxCliTests
     {
         using var project = new TestProject();
 
-        var missingDatabase = await TestProject.RunAsync(project.Root, "list");
+        var missingDatabase = await TestProject.RunAsync(project.Root, "activity", "list");
         await TestProject.RunAsync(project.Root, "init");
-        var missingActivity = await TestProject.RunAsync(project.Root, "get", "7");
-        var unsupportedOutput = await TestProject.RunAsync(project.Root, "list", "--output", "yaml");
-        var emptyOutput = await TestProject.RunAsync(project.Root, "list", "--output=");
-        var parserJson = await TestProject.RunAsync(project.Root, "list", "--output=json", "--unknown");
-        var parserJsonAfterUnknown = await TestProject.RunAsync(project.Root, "list", "--unknown", "--output=json");
+        var missingActivity = await TestProject.RunAsync(project.Root, "activity", "get", "7");
+        var unsupportedOutput = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "yaml");
+        var emptyOutput = await TestProject.RunAsync(project.Root, "activity", "list", "--output=");
+        var parserJson = await TestProject.RunAsync(project.Root, "activity", "list", "--output=json", "--unknown");
+        var parserJsonAfterUnknown = await TestProject.RunAsync(project.Root, "activity", "list", "--unknown", "--output=json");
 
         Assert.Equal(4, missingDatabase.ExitCode);
         Assert.Equal("No dbox database found.\nRun 'dbox init' to initialize this directory.\n", missingDatabase.Error);
@@ -289,7 +355,7 @@ public sealed class DboxCliTests
         var specialDirectory = project.CreateChild("project;Mode=Memory'quoted");
 
         var init = await TestProject.RunAsync(specialDirectory, "init");
-        var list = await TestProject.RunAsync(specialDirectory, "list", "--output", "json");
+        var list = await TestProject.RunAsync(specialDirectory, "activity", "list", "--output", "json");
 
         Assert.Equal(0, init.ExitCode);
         Assert.Equal(0, list.ExitCode);
@@ -302,8 +368,8 @@ public sealed class DboxCliTests
         using var project = new TestProject();
         await TestProject.RunAsync(project.Root, "init");
 
-        var add = await TestProject.RunAsync(project.Root, "add", "--type", "research", "--title", "line\nbreak\tvalue");
-        var get = await TestProject.RunAsync(project.Root, "get", "1");
+        var add = await TestProject.RunAsync(project.Root, "activity", "add", "--type", "research", "--title", "line\nbreak\tvalue");
+        var get = await TestProject.RunAsync(project.Root, "activity", "get", "1");
 
         Assert.Equal(0, add.ExitCode);
         Assert.Equal(0, get.ExitCode);
@@ -319,7 +385,7 @@ public sealed class DboxCliTests
         Directory.CreateDirectory(databaseDirectory);
         File.WriteAllBytes(Path.Combine(databaseDirectory, "data.db"), []);
 
-        var list = await TestProject.RunAsync(project.Root, "list", "--output", "json");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
 
         Assert.Equal(0, list.ExitCode);
         Assert.Equal("[]\n", list.Output);
@@ -347,7 +413,7 @@ public sealed class DboxCliTests
         Directory.CreateDirectory(databaseDirectory);
         File.WriteAllText(Path.Combine(databaseDirectory, "data.db"), "not a sqlite database");
 
-        var result = await TestProject.RunAsync(project.Root, "list", "--output", "json");
+        var result = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
         var init = await TestProject.RunAsync(project.Root, "init", "--output", "json");
 
         Assert.Equal(4, result.ExitCode);
@@ -366,6 +432,7 @@ public sealed class DboxCliTests
 
         var mixed = await TestProject.RunAsync(
             project.Root,
+            "activity",
             "add",
             "--json",
             "{\"type\":\"research\",\"title\":\"Test\"}",
@@ -373,6 +440,7 @@ public sealed class DboxCliTests
             "research");
         var unknown = await TestProject.RunAsync(
             project.Root,
+            "activity",
             "add",
             "--json",
             "{\"type\":\"research\",\"title\":\"Test\",\"unknown\":true}");

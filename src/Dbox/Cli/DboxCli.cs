@@ -51,7 +51,7 @@ public static class DboxCli
             Recursive = true
         };
 
-        var root = new RootCommand("Local project activity database CLI.")
+        var root = new RootCommand("Local project catalog database CLI.")
         {
             TreatUnmatchedTokensAsErrors = true
         };
@@ -62,11 +62,14 @@ public static class DboxCli
         init.SetAction((parseResult, cancellationToken) => runtime.RunInitAsync(parseResult, outputOption, cancellationToken));
         root.Add(init);
 
+        var activity = new Command("activity", "Manage the activity catalog.");
+        root.Add(activity);
+
         var schema = new Command("schema", "Show the public activity contract.");
         var schemaJsonOption = new Option<bool>("--json") { Description = "Render the schema as JSON." };
         schema.Options.Add(schemaJsonOption);
         schema.SetAction((parseResult, cancellationToken) => runtime.RunSchemaAsync(parseResult, outputOption, schemaJsonOption, cancellationToken));
-        root.Add(schema);
+        activity.Add(schema);
 
         var add = new Command("add", "Create an activity.");
         var addTypeOption = StringOption("--type", "Activity type.");
@@ -88,7 +91,7 @@ public static class DboxCli
             addStatusOption,
             addJsonOption,
             cancellationToken));
-        root.Add(add);
+        activity.Add(add);
 
         var list = new Command("list", "List activities.");
         var listTypeOption = StringOption("--type", "Filter by activity type.");
@@ -101,7 +104,7 @@ public static class DboxCli
             listTypeOption,
             listStatusOption,
             cancellationToken));
-        root.Add(list);
+        activity.Add(list);
 
         var get = new Command("get", "Get one activity.");
         var getIdArgument = new Argument<long>("id") { Description = "Activity id." };
@@ -111,7 +114,7 @@ public static class DboxCli
             outputOption,
             getIdArgument,
             cancellationToken));
-        root.Add(get);
+        activity.Add(get);
 
         var update = new Command("update", "Update an activity.");
         var updateIdArgument = new Argument<long>("id") { Description = "Activity id." };
@@ -136,7 +139,7 @@ public static class DboxCli
             updateStatusOption,
             updateJsonOption,
             cancellationToken));
-        root.Add(update);
+        activity.Add(update);
 
         var delete = new Command("delete", "Delete an activity.");
         var deleteIdArgument = new Argument<long>("id") { Description = "Activity id." };
@@ -146,15 +149,30 @@ public static class DboxCli
             outputOption,
             deleteIdArgument,
             cancellationToken));
-        root.Add(delete);
+        activity.Add(delete);
 
         return root;
     }
 
     public static string[] NormalizeSchemaAlias(IReadOnlyList<string> args)
     {
-        var schemaIndex = -1;
+        var activityIndex = -1;
         for (var index = 0; index < args.Count; index++)
+        {
+            if (string.Equals(args[index], "activity", StringComparison.Ordinal))
+            {
+                activityIndex = index;
+                break;
+            }
+        }
+
+        if (activityIndex < 0)
+        {
+            return args.ToArray();
+        }
+
+        var schemaIndex = -1;
+        for (var index = activityIndex + 1; index < args.Count; index++)
         {
             if (string.Equals(args[index], "--schema", StringComparison.Ordinal))
             {
@@ -192,7 +210,12 @@ public static class DboxCli
             }
         }
 
-        if (args.Count > 0 && args[0] == "schema" && args.Contains("--json", StringComparer.Ordinal))
+        var activityIndex = Array.IndexOf(args.ToArray(), "activity");
+        var schemaIndex = activityIndex + 1;
+        if (activityIndex >= 0 &&
+            schemaIndex < args.Count &&
+            args[schemaIndex] == "schema" &&
+            args.Skip(schemaIndex + 1).Contains("--json", StringComparer.Ordinal))
         {
             return OutputFormat.Json;
         }
