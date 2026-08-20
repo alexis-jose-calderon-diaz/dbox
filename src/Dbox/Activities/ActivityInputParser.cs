@@ -4,74 +4,63 @@ namespace Dbox.Activities;
 
 public static class ActivityInputParser
 {
-    public static InputResult<ActivityCreateInput> ParseCreate(
-        bool jsonProvided,
-        string? json,
-        bool typeProvided,
-        string? type,
-        bool titleProvided,
-        string? title,
-        bool descriptionProvided,
-        string? description,
-        bool statusProvided,
-        string? status)
+    public static InputResult<ActivityCreateInput> ParseCreate(string? json)
     {
-        if (jsonProvided && (typeProvided || titleProvided || descriptionProvided || statusProvided))
-        {
-            return InputResult<ActivityCreateInput>.Failure(
-                new ValidationIssue("input", "Use --json or field options, but not both."));
-        }
-
-        if (jsonProvided)
-        {
-            return ParseCreateJson(json);
-        }
-
-        return InputResult<ActivityCreateInput>.Success(new ActivityCreateInput(
-            type,
-            title,
-            description,
-            status,
-            typeProvided,
-            titleProvided,
-            descriptionProvided,
-            statusProvided));
+        return ParseCreateJson(json);
     }
 
-    public static InputResult<ActivityUpdateInput> ParseUpdate(
-        bool jsonProvided,
-        string? json,
-        bool typeProvided,
-        string? type,
-        bool titleProvided,
-        string? title,
-        bool descriptionProvided,
-        string? description,
-        bool statusProvided,
-        string? status)
+    public static InputResult<ActivityUpdateInput> ParseUpdate(string? json)
     {
-        if (jsonProvided && (typeProvided || titleProvided || descriptionProvided || statusProvided))
+        return ParseUpdateJson(json);
+    }
+
+    public static InputResult<ActivityFilter> ParseFilter(string? json)
+    {
+        if (json is null)
         {
-            return InputResult<ActivityUpdateInput>.Failure(
-                new ValidationIssue("input", "Use --json or field options, but not both."));
+            return InputResult<ActivityFilter>.Success(new ActivityFilter(null, null));
         }
 
-        if (jsonProvided)
+        var issues = new List<ValidationIssue>();
+        string? type = null;
+        string? status = null;
+        if (string.IsNullOrWhiteSpace(json))
         {
-            return ParseUpdateJson(json);
+            return InputResult<ActivityFilter>.Failure(new ValidationIssue("json", "A JSON object is required."));
         }
 
-        return InputResult<ActivityUpdateInput>.Success(new ActivityUpdateInput
+        try
         {
-            Type = type,
-            Title = title,
-            Description = description,
-            Status = status,
-            TypeProvided = typeProvided,
-            TitleProvided = titleProvided,
-            DescriptionProvided = descriptionProvided,
-            StatusProvided = statusProvided
-        });
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return InputResult<ActivityFilter>.Failure(new ValidationIssue("json", "The JSON input must be an object."));
+            }
+
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                switch (property.Name)
+                {
+                    case "type":
+                        type = ReadString(property, issues);
+                        break;
+                    case "status":
+                        status = ReadString(property, issues);
+                        break;
+                    default:
+                        issues.Add(new ValidationIssue(property.Name, "Unknown property."));
+                        break;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            issues.Add(new ValidationIssue("json", "The JSON input is invalid."));
+        }
+
+        return issues.Count > 0
+            ? new InputResult<ActivityFilter>(default, issues)
+            : InputResult<ActivityFilter>.Success(new ActivityFilter(type, status));
     }
 
     private static InputResult<ActivityCreateInput> ParseCreateJson(string? json)

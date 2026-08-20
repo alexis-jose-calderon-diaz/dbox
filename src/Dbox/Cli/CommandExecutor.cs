@@ -1,4 +1,3 @@
-using System.CommandLine;
 using Dbox.Output;
 
 namespace Dbox.Cli;
@@ -6,43 +5,28 @@ namespace Dbox.Cli;
 public sealed class CommandExecutor(OutputWriter writer)
 {
     public async Task<int> RunAsync(
-        ParseResult parseResult,
-        Option<string?> outputOption,
-        bool forceJson,
-        Func<OutputFormat, CancellationToken, Task<object?>> operation,
+        Func<CancellationToken, Task<object?>> operation,
         CancellationToken cancellationToken,
         bool rootCommand = false)
     {
-        var format = forceJson ? OutputFormat.Json : OutputFormat.Text;
         try
         {
-            var configuredOutput = parseResult.GetValue(outputOption);
-            if (!OutputFormatParser.TryParse(configuredOutput, out var parsedFormat))
-            {
-                throw CliException.Validation([new ErrorDetail("output", "Value must be text or json.")]);
-            }
-
-            if (!forceJson)
-            {
-                format = parsedFormat;
-            }
-
             if (rootCommand)
             {
                 throw CliException.Validation([new ErrorDetail("command", "A command is required.")]);
             }
 
-            var result = await operation(format, cancellationToken);
+            var result = await operation(cancellationToken);
             if (result is not null)
             {
-                writer.WriteSuccess(result, format);
+                writer.WriteSuccess(result);
             }
 
             return ExitCodes.Success;
         }
         catch (CliException exception)
         {
-            writer.WriteError(exception.Error, format);
+            writer.WriteError(exception.Error);
             return exception.Error.ExitCode;
         }
         catch (OperationCanceledException)
@@ -51,7 +35,7 @@ public sealed class CommandExecutor(OutputWriter writer)
         }
         catch (Exception)
         {
-            writer.WriteError(new CliError("unexpected_error", "Unexpected error.", ExitCodes.UnexpectedError), format);
+            writer.WriteError(new CliError("unexpected_error", "Unexpected error.", ExitCodes.UnexpectedError));
             return ExitCodes.UnexpectedError;
         }
     }

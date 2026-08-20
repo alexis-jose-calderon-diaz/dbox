@@ -5,14 +5,11 @@ namespace Dbox.Commands.Init;
 
 public static class InitCommand
 {
-    public static Command Create(CommandContext context, Option<string?> outputOption)
+    public static Command Create(CommandContext context)
     {
         var command = new Command("init", "Initialize the database in the current directory.");
-        command.SetAction((parseResult, cancellationToken) => context.Executor.RunAsync(
-            parseResult,
-            outputOption,
-            forceJson: false,
-            async (_, token) => (object?)await context.Database.InitializeAsync(
+        command.SetAction((_, cancellationToken) => context.Executor.RunAsync(
+            async token => (object?)await context.Database.InitializeAsync(
                 context.CurrentDirectoryProvider(),
                 token),
             cancellationToken));

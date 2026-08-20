@@ -14,25 +14,25 @@ public sealed class ActivityRepository
 
     public async Task<IReadOnlyList<Activity>> ListAsync(
         DboxDbContext context,
-        string? type,
-        string? status,
+        ActivityFilter filter,
+        int skip,
+        int? take,
         CancellationToken cancellationToken)
     {
-        var query = context.Activities.AsNoTracking().AsQueryable();
-        if (type is not null)
+        var query = ApplyFilter(context, filter)
+            .OrderBy(activity => activity.CreatedAt)
+            .ThenBy(activity => activity.Id)
+            .Skip(skip);
+        if (take is not null)
         {
-            query = query.Where(activity => activity.Type == type);
+            query = query.Take(take.Value);
         }
 
-        if (status is not null)
-        {
-            query = query.Where(activity => activity.Status == status);
-        }
-
-        return await query
-            .OrderByDescending(activity => activity.Id)
-            .ToListAsync(cancellationToken);
+        return await query.ToListAsync(cancellationToken);
     }
+
+    public Task<int> CountAsync(DboxDbContext context, ActivityFilter filter, CancellationToken cancellationToken) =>
+        ApplyFilter(context, filter).CountAsync(cancellationToken);
 
     public Task<Activity?> GetAsync(DboxDbContext context, long id, CancellationToken cancellationToken)
     {
@@ -86,5 +86,21 @@ public sealed class ActivityRepository
         context.Activities.Remove(activity);
         await context.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    private static IQueryable<Activity> ApplyFilter(DboxDbContext context, ActivityFilter filter)
+    {
+        var query = context.Activities.AsNoTracking().AsQueryable();
+        if (filter.Type is not null)
+        {
+            query = query.Where(activity => activity.Type == filter.Type);
+        }
+
+        if (filter.Status is not null)
+        {
+            query = query.Where(activity => activity.Status == filter.Status);
+        }
+
+        return query;
     }
 }

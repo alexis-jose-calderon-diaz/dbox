@@ -41,6 +41,22 @@ public static class ActivityValidator
         return new ValidationResult(issues);
     }
 
+    public static ValidationResult ValidateFilter(ActivityFilter filter)
+    {
+        var issues = new List<ValidationIssue>();
+        if (filter.Type is not null && !ActivitySchema.IsType(filter.Type))
+        {
+            issues.Add(new ValidationIssue("type", $"Value must be one of: {string.Join(", ", ActivitySchema.Types)}."));
+        }
+
+        if (filter.Status is not null && !ActivitySchema.IsStatus(filter.Status))
+        {
+            issues.Add(new ValidationIssue("status", $"Value must be one of: {string.Join(", ", ActivitySchema.Statuses)}."));
+        }
+
+        return new ValidationResult(issues);
+    }
+
     private static void ValidateEnum(
         string? value,
         bool provided,

@@ -1,7 +1,6 @@
 using System.CommandLine;
 using CommandRoot = System.CommandLine.RootCommand;
 using Dbox.Activities;
-using Dbox.Commands.Activity;
 using Dbox.Database;
 using Dbox.Output;
 using RootCommandBuilder = Dbox.Commands.Root.RootCommand;
@@ -17,20 +16,17 @@ public static class DboxCli
         string currentDirectory,
         CancellationToken cancellationToken = default)
     {
-        var normalizedArgs = ActivityCommand.NormalizeSchemaAlias(args);
         var writer = new OutputWriter(output, error);
         var root = BuildRootCommand(writer, () => currentDirectory);
-        var parseResult = root.Parse(normalizedArgs);
+        var parseResult = root.Parse(args);
 
         if (parseResult.Errors.Count > 0)
         {
             var details = parseResult.Errors
                 .Select(_ => new ErrorDetail("command", "Invalid command syntax."))
                 .ToArray();
-            var format = ErrorFormatDetector.Detect(normalizedArgs);
             writer.WriteError(
-                new CliError("validation_error", "Invalid command.", ExitCodes.ValidationError, details),
-                format);
+                new CliError("validation_error", "Invalid command.", ExitCodes.ValidationError, details));
             return ExitCodes.ValidationError;
         }
 

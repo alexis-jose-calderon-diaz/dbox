@@ -6,7 +6,7 @@ namespace Dbox.Commands.Activity.Get;
 
 public static class GetCommand
 {
-    public static Command Create(CommandContext context, Option<string?> outputOption)
+    public static Command Create(CommandContext context)
     {
         var command = new Command("get", "Get one activity.");
         var idArgument = new Argument<long>("id")
@@ -15,10 +15,7 @@ public static class GetCommand
         };
         command.Arguments.Add(idArgument);
         command.SetAction((parseResult, cancellationToken) => context.Executor.RunAsync(
-            parseResult,
-            outputOption,
-            forceJson: false,
-            (_, token) => ExecuteAsync(
+            token => ExecuteAsync(
                 context,
                 parseResult.GetValue(idArgument),
                 token),

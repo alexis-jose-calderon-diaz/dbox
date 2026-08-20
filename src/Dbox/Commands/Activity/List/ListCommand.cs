@@ -7,18 +7,17 @@ namespace Dbox.Commands.Activity.List;
 
 public static class ListCommand
 {
-    public static Command Create(CommandContext context, Option<string?> outputOption)
+    public static Command Create(CommandContext context)
     {
         var command = new Command("list", "List activities.");
-        var typeOption = StringOption("--type", "Filter by activity type.");
-        var statusOption = StringOption("--status", "Filter by activity status.");
-        command.Options.Add(typeOption);
-        command.Options.Add(statusOption);
+        var jsonOption = new Option<string?>("--json") { Description = "Filters as a JSON object." };
+        var skipOption = new Option<int?>("--skip") { Description = "Number of ordered records to skip." };
+        var takeOption = new Option<int?>("--take") { Description = "Maximum number of records to return." };
+        command.Options.Add(jsonOption);
+        command.Options.Add(skipOption);
+        command.Options.Add(takeOption);
         command.SetAction((parseResult, cancellationToken) => context.Executor.RunAsync(
-            parseResult,
-            outputOption,
-            forceJson: false,
-            (_, token) => ExecuteAsync(context, parseResult, typeOption, statusOption, token),
+            token => ExecuteAsync(context, parseResult, jsonOption, skipOption, takeOption, token),
             cancellationToken));
         return command;
     }
@@ -26,31 +25,34 @@ public static class ListCommand
     private static async Task<object?> ExecuteAsync(
         CommandContext context,
         ParseResult parseResult,
-        Option<string?> typeOption,
-        Option<string?> statusOption,
+        Option<string?> jsonOption,
+        Option<int?> skipOption,
+        Option<int?> takeOption,
         CancellationToken cancellationToken)
     {
-        var type = parseResult.GetValue(typeOption);
-        var status = parseResult.GetValue(statusOption);
+        var filter = ActivityInputParser.ParseFilter(parseResult.GetValue(jsonOption));
+        ActivityCommand.ThrowIfInvalid(filter.Issues);
+        var validation = ActivityValidator.ValidateFilter(filter.Value!);
+        ActivityCommand.ThrowIfInvalid(validation.Issues);
+
+        var skip = parseResult.GetValue(skipOption) ?? 0;
+        var take = parseResult.GetValue(takeOption);
         var issues = new List<ValidationIssue>();
-        if (type is not null && !ActivitySchema.IsType(type))
+        if (skip < 0)
         {
-            issues.Add(new ValidationIssue("type", $"Value must be one of: {string.Join(", ", ActivitySchema.Types)}."));
+            issues.Add(new ValidationIssue("skip", "Value must be greater than or equal to 0."));
         }
 
-        if (status is not null && !ActivitySchema.IsStatus(status))
+        if (take is < 0)
         {
-            issues.Add(new ValidationIssue("status", $"Value must be one of: {string.Join(", ", ActivitySchema.Statuses)}."));
+            issues.Add(new ValidationIssue("take", "Value must be greater than or equal to 0."));
         }
 
         ActivityCommand.ThrowIfInvalid(issues);
         var activities = await context.Database.ExecuteAsync(
             context.CurrentDirectoryProvider(),
-            (dbContext, token) => context.ActivityRepository.ListAsync(dbContext, type, status, token),
+            (dbContext, token) => context.ActivityRepository.ListAsync(dbContext, filter.Value!, skip, take, token),
             cancellationToken);
         return activities.Select(ActivityView.FromEntity).ToList();
     }
-
-    private static Option<string?> StringOption(string name, string description) =>
-        new(name) { Description = description };
 }
