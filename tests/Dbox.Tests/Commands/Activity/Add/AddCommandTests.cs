@@ -14,13 +14,9 @@ public sealed class AddCommandTests
             project.Root,
             "activity",
             "add",
-            "--type",
-            "invalid",
-            "--title",
-            "",
-            "--output",
-            "json");
-        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
+            "--json",
+            "{\"type\":\"invalid\",\"title\":\"\"}");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list");
 
         Assert.Equal(2, invalid.ExitCode);
         Assert.Empty(invalid.Output);
@@ -34,9 +30,9 @@ public sealed class AddCommandTests
         using var project = new TestProject();
         await TestProject.RunAsync(project.Root, "init");
 
-        var wrongCase = await TestProject.RunAsync(project.Root, "activity", "add", "--type", "Research", "--title", "Valid");
-        var tooLong = await TestProject.RunAsync(project.Root, "activity", "add", "--type", "research", "--title", new string('x', 201));
-        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
+        var wrongCase = await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"Research\",\"title\":\"Valid\"}");
+        var tooLong = await TestProject.RunAsync(project.Root, "activity", "add", "--json", $"{{\"type\":\"research\",\"title\":\"{new string('x', 201)}\"}}");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list");
 
         Assert.Equal(2, wrongCase.ExitCode);
         Assert.Equal(2, tooLong.ExitCode);
@@ -46,17 +42,16 @@ public sealed class AddCommandTests
     }
 
     [Fact]
-    public async Task MixedInputAndUnknownJsonPropertiesAreRejected()
+    public async Task MissingPayloadFieldOptionsAndUnknownJsonPropertiesAreRejected()
     {
         using var project = new TestProject();
         await TestProject.RunAsync(project.Root, "init");
 
-        var mixed = await TestProject.RunAsync(
+        var missing = await TestProject.RunAsync(project.Root, "activity", "add");
+        var fieldOption = await TestProject.RunAsync(
             project.Root,
             "activity",
             "add",
-            "--json",
-            "{\"type\":\"research\",\"title\":\"Test\"}",
             "--type",
             "research");
         var unknown = await TestProject.RunAsync(
@@ -66,9 +61,11 @@ public sealed class AddCommandTests
             "--json",
             "{\"type\":\"research\",\"title\":\"Test\",\"unknown\":true}");
 
-        Assert.Equal(2, mixed.ExitCode);
+        Assert.Equal(2, missing.ExitCode);
+        Assert.Equal(2, fieldOption.ExitCode);
         Assert.Equal(2, unknown.ExitCode);
-        Assert.Contains("Validation error:", mixed.Error);
+        Assert.Contains("validation_error", missing.Error);
+        Assert.Contains("validation_error", fieldOption.Error);
         Assert.Contains("Unknown property", unknown.Error);
     }
 }

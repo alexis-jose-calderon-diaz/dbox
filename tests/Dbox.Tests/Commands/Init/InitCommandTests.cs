@@ -10,15 +10,15 @@ public sealed class InitCommandTests
         using var project = new TestProject();
 
         var firstInit = await TestProject.RunAsync(project.Root, "init");
-        var add = await TestProject.RunAsync(project.Root, "activity", "add", "--type", "implementation", "--title", "Keep me");
+        var add = await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"implementation\",\"title\":\"Keep me\"}");
         var secondInit = await TestProject.RunAsync(project.Root, "init");
-        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list");
 
         Assert.Equal(0, firstInit.ExitCode);
-        Assert.Equal("Database initialized: .dbox/data.db\n", firstInit.Output);
+        Assert.Contains("\"status\": \"initialized\"", firstInit.Output);
         Assert.Equal(0, add.ExitCode);
         Assert.Equal(0, secondInit.ExitCode);
-        Assert.Equal("Database already initialized: .dbox/data.db\n", secondInit.Output);
+        Assert.Contains("\"status\": \"already_initialized\"", secondInit.Output);
         Assert.Equal(0, list.ExitCode);
         Assert.Contains("Keep me", list.Output);
         Assert.True(File.Exists(Path.Combine(project.Root, ".dbox", "data.db")));
@@ -31,10 +31,10 @@ public sealed class InitCommandTests
         var child = project.CreateChild();
 
         await TestProject.RunAsync(project.Root, "init");
-        await TestProject.RunAsync(project.Root, "activity", "add", "--type", "research", "--title", "Parent");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Parent\"}");
         var childInit = await TestProject.RunAsync(child, "init");
-        var childList = await TestProject.RunAsync(child, "activity", "list", "--output", "json");
-        var parentList = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
+        var childList = await TestProject.RunAsync(child, "activity", "list");
+        var parentList = await TestProject.RunAsync(project.Root, "activity", "list");
 
         Assert.Equal(0, childInit.ExitCode);
         Assert.Equal("[]\n", childList.Output);
@@ -52,6 +52,6 @@ public sealed class InitCommandTests
         var init = await TestProject.RunAsync(project.Root, "init");
 
         Assert.Equal(0, init.ExitCode);
-        Assert.Equal("Database migrated: .dbox/data.db\n", init.Output);
+        Assert.Contains("\"status\": \"migrated\"", init.Output);
     }
 }

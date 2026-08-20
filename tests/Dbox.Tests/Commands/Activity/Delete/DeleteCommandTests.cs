@@ -9,10 +9,10 @@ public sealed class DeleteCommandTests
     {
         using var project = new TestProject();
         await TestProject.RunAsync(project.Root, "init");
-        await TestProject.RunAsync(project.Root, "activity", "add", "--type", "research", "--title", "Delete me");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Delete me\"}");
 
-        var deleted = await TestProject.RunAsync(project.Root, "activity", "delete", "1", "--output", "json");
-        var missing = await TestProject.RunAsync(project.Root, "activity", "get", "1", "--output", "json");
+        var deleted = await TestProject.RunAsync(project.Root, "activity", "delete", "1");
+        var missing = await TestProject.RunAsync(project.Root, "activity", "get", "1");
 
         Assert.Equal(0, deleted.ExitCode);
         Assert.Contains("\"deleted\": true", deleted.Output);

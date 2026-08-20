@@ -15,53 +15,41 @@ public sealed class ActivityCrudTests
             project.Root,
             "activity",
             "add",
-            "--type",
-            "research",
-            "--title",
-            "Investigate",
-            "--output",
-            "json");
+            "--json",
+            "{\"type\":\"research\",\"title\":\"Investigate\"}");
         var secondAdd = await TestProject.RunAsync(
             project.Root,
             "activity",
             "add",
             "--json",
-            "{\"type\":\"implementation\",\"title\":\"Build\",\"description\":\"Details\",\"status\":\"pending\"}",
-            "--output",
-            "json");
-        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
-        var filteredList = await TestProject.RunAsync(project.Root, "activity", "list", "--type", "implementation", "--status", "pending", "--output", "json");
+            "{\"type\":\"implementation\",\"title\":\"Build\",\"description\":\"Details\",\"status\":\"pending\"}");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list");
+        var filteredList = await TestProject.RunAsync(project.Root, "activity", "list", "--json", "{\"type\":\"implementation\",\"status\":\"pending\"}");
         var update = await TestProject.RunAsync(
             project.Root,
             "activity",
             "update",
             "1",
             "--json",
-            "{\"description\":null,\"status\":\"completed\"}",
-            "--output",
-            "json");
-        var get = await TestProject.RunAsync(project.Root, "activity", "get", "1", "--output", "json");
-        var emptyUpdate = await TestProject.RunAsync(project.Root, "activity", "update", "1", "--output", "json");
+            "{\"description\":null,\"status\":\"completed\"}");
+        var get = await TestProject.RunAsync(project.Root, "activity", "get", "1");
+        var emptyUpdate = await TestProject.RunAsync(project.Root, "activity", "update", "1");
         var optionUpdate = await TestProject.RunAsync(
             project.Root,
             "activity",
             "update",
             "2",
-            "--status",
-            "in_progress",
-            "--output",
-            "json");
+            "--json",
+            "{\"status\":\"in_progress\"}");
         var generatedUpdate = await TestProject.RunAsync(
             project.Root,
             "activity",
             "update",
             "1",
             "--json",
-            "{\"id\":99}",
-            "--output",
-            "json");
-        var deleted = await TestProject.RunAsync(project.Root, "activity", "delete", "1", "--output", "json");
-        var missing = await TestProject.RunAsync(project.Root, "activity", "get", "1", "--output", "json");
+            "{\"id\":99}");
+        var deleted = await TestProject.RunAsync(project.Root, "activity", "delete", "1");
+        var missing = await TestProject.RunAsync(project.Root, "activity", "get", "1");
         using var listDocument = JsonDocument.Parse(list.Output);
         using var filteredDocument = JsonDocument.Parse(filteredList.Output);
         using var firstAddDocument = JsonDocument.Parse(firstAdd.Output);
@@ -76,8 +64,8 @@ public sealed class ActivityCrudTests
         Assert.Contains("\"status\": \"pending\"", secondAdd.Output);
         Assert.Equal(0, list.ExitCode);
         Assert.Equal(2, listDocument.RootElement.GetArrayLength());
-        Assert.Equal(2, listDocument.RootElement[0].GetProperty("id").GetInt64());
-        Assert.Equal(1, listDocument.RootElement[1].GetProperty("id").GetInt64());
+        Assert.Equal(1, listDocument.RootElement[0].GetProperty("id").GetInt64());
+        Assert.Equal(2, listDocument.RootElement[1].GetProperty("id").GetInt64());
         Assert.Equal(1, filteredDocument.RootElement.GetArrayLength());
         Assert.Equal("Build", filteredDocument.RootElement[0].GetProperty("title").GetString());
         Assert.Equal(0, update.ExitCode);

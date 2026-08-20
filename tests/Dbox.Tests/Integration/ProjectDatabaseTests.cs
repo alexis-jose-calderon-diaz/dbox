@@ -11,8 +11,8 @@ public sealed class ProjectDatabaseTests
         var nested = project.CreateChild("src/feature");
 
         await TestProject.RunAsync(project.Root, "init");
-        await TestProject.RunAsync(project.Root, "activity", "add", "--type", "research", "--title", "Parent activity");
-        var result = await TestProject.RunAsync(nested, "activity", "list", "--output", "json");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Parent activity\"}");
+        var result = await TestProject.RunAsync(nested, "activity", "list");
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Parent activity", result.Output);
@@ -29,8 +29,7 @@ public sealed class ProjectDatabaseTests
         var result = await TestProject.RunAsync(child, "activity", "list");
 
         Assert.Equal(4, result.ExitCode);
-        Assert.Contains("No dbox database found.", result.Error);
-        Assert.Contains("Run 'dbox init' to initialize this directory.", result.Error);
+        Assert.Contains("database_not_found", result.Error);
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public sealed class ProjectDatabaseTests
         var specialDirectory = project.CreateChild("project;Mode=Memory'quoted");
 
         var init = await TestProject.RunAsync(specialDirectory, "init");
-        var list = await TestProject.RunAsync(specialDirectory, "activity", "list", "--output", "json");
+        var list = await TestProject.RunAsync(specialDirectory, "activity", "list");
 
         Assert.Equal(0, init.ExitCode);
         Assert.Equal(0, list.ExitCode);
@@ -55,7 +54,7 @@ public sealed class ProjectDatabaseTests
         Directory.CreateDirectory(databaseDirectory);
         File.WriteAllBytes(Path.Combine(databaseDirectory, "data.db"), []);
 
-        var list = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list");
 
         Assert.Equal(0, list.ExitCode);
         Assert.Equal("[]\n", list.Output);
@@ -69,8 +68,8 @@ public sealed class ProjectDatabaseTests
         Directory.CreateDirectory(databaseDirectory);
         File.WriteAllText(Path.Combine(databaseDirectory, "data.db"), "not a sqlite database");
 
-        var result = await TestProject.RunAsync(project.Root, "activity", "list", "--output", "json");
-        var init = await TestProject.RunAsync(project.Root, "init", "--output", "json");
+        var result = await TestProject.RunAsync(project.Root, "activity", "list");
+        var init = await TestProject.RunAsync(project.Root, "init");
 
         Assert.Equal(4, result.ExitCode);
         Assert.Empty(result.Output);

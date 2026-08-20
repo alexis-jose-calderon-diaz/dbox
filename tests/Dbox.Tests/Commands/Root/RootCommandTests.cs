@@ -24,6 +24,7 @@ public sealed class RootCommandTests
         Assert.Contains("schema", activityHelp.Output);
         Assert.Contains("add", activityHelp.Output);
         Assert.Contains("list", activityHelp.Output);
+        Assert.Contains("count", activityHelp.Output);
         Assert.Contains("get", activityHelp.Output);
         Assert.Contains("update", activityHelp.Output);
         Assert.Contains("delete", activityHelp.Output);
@@ -40,7 +41,8 @@ public sealed class RootCommandTests
             new[] { "list" },
             new[] { "get", "1" },
             new[] { "update", "1" },
-            new[] { "delete", "1" }
+            new[] { "delete", "1" },
+            new[] { "count" }
         };
 
         foreach (var arguments in flatCommands)
@@ -49,18 +51,18 @@ public sealed class RootCommandTests
 
             Assert.Equal(ExitCodes.ValidationError, result.ExitCode);
             Assert.Empty(result.Output);
-            Assert.Contains("Validation error:", result.Error);
+            Assert.Contains("validation_error", result.Error);
         }
 
         var rootSchemaAlias = await TestProject.RunAsync(project.Root, "--schema");
-        var rootSchemaAliasJson = await TestProject.RunAsync(project.Root, "--schema", "--json");
+        var activitySchemaAlias = await TestProject.RunAsync(project.Root, "activity", "--schema");
 
         Assert.Equal(ExitCodes.ValidationError, rootSchemaAlias.ExitCode);
-        Assert.Equal(ExitCodes.ValidationError, rootSchemaAliasJson.ExitCode);
+        Assert.Equal(ExitCodes.ValidationError, activitySchemaAlias.ExitCode);
         Assert.Empty(rootSchemaAlias.Output);
-        Assert.Empty(rootSchemaAliasJson.Output);
-        Assert.Contains("Validation error:", rootSchemaAlias.Error);
-        Assert.Contains("Validation error:", rootSchemaAliasJson.Error);
+        Assert.Empty(activitySchemaAlias.Output);
+        Assert.Contains("validation_error", rootSchemaAlias.Error);
+        Assert.Contains("validation_error", activitySchemaAlias.Error);
         Assert.False(Directory.Exists(Path.Combine(project.Root, ".dbox")));
     }
 }
