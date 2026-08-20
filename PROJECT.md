@@ -13,14 +13,14 @@ la implementacion, las pruebas y la documentacion de uso.
 
 ## Proposito
 
-`dbox` es una CLI local para administrar datos estructurados en SQLite sin que
-las personas, scripts o agentes de IA tengan que escribir SQL. La CLI es el
-contrato publico de acceso a los datos.
+`dbox` es una CLI local para administrar catalogos de datos estructurados en
+SQLite sin que las personas, scripts o agentes de IA tengan que escribir SQL.
+La CLI es el contrato publico de acceso a los datos.
 
-La primera version administra una sola entidad fija llamada `activity`. La
-herramienta esta preparada para incorporar entidades adicionales en versiones
-futuras, pero no permitira que cada usuario defina entidades, columnas o
-esquemas dinamicos.
+La primera version administra el catalogo `activity`, que contiene una sola
+entidad fija. La herramienta esta preparada para incorporar catalogos
+adicionales, como `command` y `skill`, pero no permitira que cada usuario defina
+entidades, columnas o esquemas dinamicos.
 
 El producto prioriza:
 
@@ -40,10 +40,41 @@ El producto prioriza:
   `.dbox` mas cercana al directorio de trabajo actual.
 - Una **base inicializada** es una base que existe, contiene el historial de
   migraciones de EF Core y tiene todas las migraciones conocidas aplicadas.
-- Un **comando de datos** es `add`, `list`, `get`, `update` o `delete`.
+- Una **operacion de infraestructura compartida** afecta a todos los catalogos
+  del proyecto y vive en la raiz de la CLI.
+- Un **catalogo** es un grupo de comandos que administra sus propios datos y
+  contrato.
+- Un **comando de datos** es `add`, `list`, `get`, `update` o `delete` dentro de
+  un catalogo.
 
 No existe una base global, una carpeta de usuario, un servidor remoto ni un
 almacenamiento compartido por defecto.
+
+### Jerarquia de comandos
+
+La raiz de `dbox` contiene exclusivamente operaciones de infraestructura
+compartida y los grupos de catalogos disponibles. `init` es la unica operacion
+de infraestructura del MVP: crea la base local del proyecto y aplica todas las
+migraciones conocidas por la version instalada, incluidas las tablas de
+cualquier catalogo futuro.
+
+Las operaciones especificas de datos y contrato viven dentro de su catalogo:
+
+```text
+dbox
+├── init
+└── activity
+    ├── schema
+    ├── add
+    ├── list
+    ├── get
+    ├── update
+    └── delete
+```
+
+No existen `activity init`, `command init` ni `skill init`. Los catalogos
+futuros se agregaran como grupos hermanos de `activity` sin volver a exponer
+sus operaciones directamente en la raiz.
 
 ## Alcance del MVP
 
@@ -129,12 +160,12 @@ pendientes.
 Todo comando excepto `init` debe resolver una base antes de hacer su trabajo:
 
 ```bash
-dbox schema
-dbox add --type research --title "Evaluacion"
-dbox list
-dbox get 1
-dbox update 1 --status completed
-dbox delete 1
+dbox activity schema
+dbox activity add --type research --title "Evaluacion"
+dbox activity list
+dbox activity get 1
+dbox activity update 1 --status completed
+dbox activity delete 1
 ```
 
 El algoritmo de descubrimiento debe estar centralizado en un unico componente,
@@ -158,7 +189,7 @@ Ejemplo:
 /proyecto/src/Features/Area
 ```
 
-Al ejecutar `dbox list` desde `/proyecto/src/Features/Area`, se debe usar
+Al ejecutar `dbox activity list` desde `/proyecto/src/Features/Area`, se debe usar
 `/proyecto/.dbox/data.db`.
 
 Si un padre y un hijo contienen `.dbox`, prevalece siempre el mas cercano. Por
@@ -226,15 +257,16 @@ del codigo fuente versionado de `dbox`.
 
 ### Aplicacion de migraciones
 
-`init` y todos los comandos que resuelven una base de proyecto deben ejecutar
-`Database.MigrateAsync()` antes de su operacion principal. Esto incluye
-`schema`, para que una invocacion sobre una base existente siempre la deje en
-la version conocida por la CLI.
+`init` y todos los comandos de catalogo que resuelven una base de proyecto
+deben ejecutar `Database.MigrateAsync()` antes de su operacion principal. Esto
+incluye `activity schema`, para que una invocacion sobre una base existente
+siempre la deje en la version conocida por la CLI.
 
-Las migraciones se aplican de forma silenciosa en `add`, `list`, `get`,
-`update`, `delete` y `schema`: la salida normal de esos comandos no incluira
-mensajes adicionales que rompan scripts o JSON. `init` es el unico comando que
-informa explicitamente si inicializo o migro la base.
+Las migraciones se aplican de forma silenciosa en `activity add`,
+`activity list`, `activity get`, `activity update`, `activity delete` y
+`activity schema`: la salida normal de esos comandos no incluira mensajes
+adicionales que rompan scripts o JSON. `init` es el unico comando que informa
+explicitamente si inicializo o migro la base.
 
 EF Core mantiene el estado aplicado en `__EFMigrationsHistory`. En SQLite, EF
 Core tambien usa su mecanismo de bloqueo de migraciones para evitar que dos
@@ -298,16 +330,16 @@ de verdad de:
 - longitud maxima de `title`;
 - validacion de entradas;
 - restricciones equivalentes de la configuracion EF Core;
-- salida humana y JSON del comando `schema`.
+- salida humana y JSON del comando `activity schema`.
 
 No se deben repetir manualmente valores de enum, limites o reglas en el
-validador, el contexto EF Core y el comando `schema`.
+validador, el contexto EF Core y el comando `activity schema`.
 
 ## Contrato de la CLI
 
-La ayuda de `dbox --help` y el contrato de `dbox schema --json` deben bastar
-para que un agente descubra y use la herramienta sin conocer previamente la
-base.
+La ayuda de `dbox --help`, `dbox activity --help` y el contrato de
+`dbox activity schema --json` deben bastar para que un agente descubra y use la
+herramienta sin conocer previamente la base.
 
 Todos los comandos que producen datos aceptan `--output text` o
 `--output json`. `text` es el valor predeterminado. Los mensajes de ayuda
@@ -339,19 +371,20 @@ resultado, por ejemplo:
 Los valores posibles de `status` son `initialized`, `already_initialized` y
 `migrated`.
 
-### schema y alias --schema
+### activity schema y alias --schema
 
 ```bash
-dbox schema
-dbox schema --json
-dbox --schema
-dbox --schema --json
+dbox activity schema
+dbox activity schema --json
+dbox activity --schema
+dbox activity --schema --json
 ```
 
-`--schema` es un alias funcional de `schema`. Ambos resuelven primero la base
-de proyecto, aplican migraciones y luego muestran el contrato publico. El
-comando no debe exponer directamente `PRAGMA table_info` ni detalles internos
-de EF Core.
+`activity --schema` es un alias funcional de `activity schema`. Ambos resuelven
+primero la base de proyecto, aplican migraciones y luego muestran el contrato
+publico. `dbox --schema` no es valido porque la raiz no expone contratos de
+catalogos. El comando no debe exponer directamente `PRAGMA table_info` ni
+detalles internos de EF Core.
 
 La salida humana debe presentar la entidad y sus reglas de forma legible. La
 salida JSON debe mantener esta forma estable:
@@ -406,19 +439,19 @@ salida JSON debe mantener esta forma estable:
 }
 ```
 
-### add
+### activity add
 
 La creacion admite opciones o un objeto JSON, pero no una mezcla de ambas
 formas de entrada.
 
 ```bash
-dbox add \
+dbox activity add \
   --type implementation \
   --title "Implementa refresh token" \
   --description "Se agrega renovacion mediante cookie HttpOnly" \
   --status completed
 
-dbox add --json '{
+dbox activity add --json '{
   "type": "implementation",
   "title": "Implementa refresh token",
   "description": "Se agrega renovacion mediante cookie HttpOnly",
@@ -444,13 +477,13 @@ La actividad creada se devuelve en la salida seleccionada. En JSON su forma es:
 }
 ```
 
-### list
+### activity list
 
 ```bash
-dbox list
-dbox list --type research
-dbox list --status completed
-dbox list --type research --status completed --output json
+dbox activity list
+dbox activity list --type research
+dbox activity list --status completed
+dbox activity list --type research --status completed --output json
 ```
 
 Las actividades se ordenan siempre por `id DESC`. Los filtros `--type` y
@@ -464,11 +497,11 @@ arreglo, incluso cuando no hay actividades:
 La salida humana usa una tabla con `ID`, `CREATED_AT`, `TYPE`, `STATUS` y
 `TITLE`.
 
-### get
+### activity get
 
 ```bash
-dbox get 15
-dbox get 15 --output json
+dbox activity get 15
+dbox activity get 15 --output json
 ```
 
 Devuelve todos los campos de la actividad. Si no existe, muestra:
@@ -479,12 +512,12 @@ Activity 15 not found.
 
 y retorna exit code `3`.
 
-### update
+### activity update
 
 ```bash
-dbox update 15 --status completed
+dbox activity update 15 --status completed
 
-dbox update 15 --json '{
+dbox activity update 15 --json '{
   "status": "completed",
   "title": "Nuevo titulo"
 }'
@@ -496,14 +529,14 @@ JSON limpia la descripcion; su ausencia no la modifica. Los demas campos no
 aceptan `null`.
 
 La actualizacion debe contener al menos un campo modificable. Se aplican las
-mismas reglas de validacion que en `add`. `id` y `created_at` permanecen sin
+mismas reglas de validacion que en `activity add`. `id` y `created_at` permanecen sin
 cambios. La respuesta exitosa devuelve la actividad completa actualizada.
 
-### delete
+### activity delete
 
 ```bash
-dbox delete 15
-dbox delete 15 --output json
+dbox activity delete 15
+dbox activity delete 15 --output json
 ```
 
 No solicita confirmacion interactiva. Si la actividad existe, la elimina y
@@ -522,7 +555,7 @@ Su respuesta JSON estable es:
 }
 ```
 
-Si no existe, devuelve el mismo error y exit code que `get`.
+Si no existe, devuelve el mismo error y exit code que `activity get`.
 
 ## Validacion y errores
 
@@ -641,13 +674,13 @@ Como minimo se deben cubrir:
 - ausencia de `.dbox/data.db` devuelve el mensaje y exit code definidos;
 - una `.dbox` incompleta bloquea la busqueda hacia un ancestro;
 - las migraciones pendientes se aplican antes de cada comando que usa base;
-- `schema` humano y JSON reflejan enums, requeridos y mutabilidad;
-- `add` crea una actividad valida y aplica el status por defecto;
-- `add` rechaza enum invalido, titulo vacio y titulo de mas de 200 caracteres;
-- `list` ordena por `id DESC`, filtra y produce un arreglo JSON valido;
-- `get` encuentra registros y devuelve not found correctamente;
-- `update` cambia solo campos enviados y conserva `id` y `created_at`;
-- `delete` elimina registros y maneja not found;
+- `activity schema` humano y JSON reflejan enums, requeridos y mutabilidad;
+- `activity add` crea una actividad valida y aplica el status por defecto;
+- `activity add` rechaza enum invalido, titulo vacio y titulo de mas de 200 caracteres;
+- `activity list` ordena por `id DESC`, filtra y produce un arreglo JSON valido;
+- `activity get` encuentra registros y devuelve not found correctamente;
+- `activity update` cambia solo campos enviados y conserva `id` y `created_at`;
+- `activity delete` elimina registros y maneja not found;
 - las respuestas de error JSON son validas, estables y se escriben en `stderr`.
 
 ## Criterio de aceptacion futuro
@@ -658,32 +691,32 @@ funcione desde la raiz de un proyecto:
 ```bash
 dbox init
 
-dbox --schema
+dbox activity schema
 
-dbox add \
+dbox activity add \
   --type implementation \
   --title "Primera actividad"
 
-dbox list
+dbox activity list
 
-dbox get 1
+dbox activity get 1
 
-dbox update 1 \
+dbox activity update 1 \
   --status completed
 
-dbox delete 1
+dbox activity delete 1
 ```
 
 Y cuando el flujo JSON equivalente sea valido para scripts y agentes:
 
 ```bash
-dbox --schema --json
+dbox activity schema --json
 
-dbox add \
+dbox activity add \
   --json '{"type":"research","title":"Prueba"}' \
   --output json
 
-dbox list --status completed --output json
+dbox activity list --status completed --output json
 ```
 
 La validacion final debera incluir compilacion, ejecucion de todas las pruebas

@@ -8,7 +8,7 @@ Define the local, isolated SQLite lifecycle that lets every dbox project own and
 
 ### Requirement: Project-local initialization
 
-The system SHALL initialize only the current working directory when the user runs `dbox init`.
+The system SHALL initialize only the current working directory when the user runs `dbox init`. This root command is shared infrastructure for every current and future catalog and SHALL apply all migrations known to the installed CLI.
 
 #### Scenario: Initialize a new directory
 
@@ -56,7 +56,7 @@ Every command except `init` SHALL resolve the first `.dbox` directory found whil
 
 ### Requirement: Automatic migration before data operations
 
-Every command that resolves a project database SHALL apply pending known migrations before its main operation, including `schema` and every data command.
+Every catalog command that resolves a project database SHALL apply pending known migrations before its main operation, including `dbox activity schema` and every `dbox activity` data command.
 
 #### Scenario: Run a command against a database with pending migrations
 
