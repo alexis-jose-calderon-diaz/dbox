@@ -1,7 +1,7 @@
-using Dbox.Activities;
+using Dbox.Database;
 using Microsoft.EntityFrameworkCore;
 
-namespace Dbox.Database;
+namespace Dbox.Activities;
 
 public sealed class ActivityRepository
 {

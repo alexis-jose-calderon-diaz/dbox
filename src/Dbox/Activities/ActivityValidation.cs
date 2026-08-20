@@ -83,19 +83,3 @@ public static class ActivityValidator
         }
     }
 }
-
-public sealed record ValidationIssue(string Field, string Message);
-
-public sealed record ValidationResult(IReadOnlyList<ValidationIssue> Issues)
-{
-    public bool IsValid => Issues.Count == 0;
-}
-
-public sealed record InputResult<T>(T? Value, IReadOnlyList<ValidationIssue> Issues)
-{
-    public bool IsValid => Issues.Count == 0;
-
-    public static InputResult<T> Success(T value) => new(value, []);
-
-    public static InputResult<T> Failure(params ValidationIssue[] issues) => new(default, issues);
-}

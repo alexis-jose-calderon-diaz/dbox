@@ -1,4 +1,5 @@
 using Dbox.Cli;
+using Dbox.Output;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dbox.Database;
