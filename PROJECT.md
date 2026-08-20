@@ -44,8 +44,8 @@ El producto prioriza:
   del proyecto y vive en la raiz de la CLI.
 - Un **catalogo** es un grupo de comandos que administra sus propios datos y
   contrato.
-- Un **comando de datos** es `add`, `list`, `get`, `update` o `delete` dentro de
-  un catalogo.
+- Un **comando de datos** es `add`, `list`, `count`, `get`, `update` o `delete`
+  dentro de un catalogo.
 
 No existe una base global, una carpeta de usuario, un servidor remoto ni un
 almacenamiento compartido por defecto.
@@ -67,6 +67,7 @@ dbox
     ├── schema
     ├── add
     ├── list
+    ├── count
     ├── get
     ├── update
     └── delete
@@ -83,9 +84,9 @@ El MVP debe permitir:
 1. Inicializar una base local por proyecto.
 2. Descubrir automaticamente la base de proyecto mas cercana.
 3. Mostrar el contrato de datos y sus reglas para humanos y agentes.
-4. Crear, listar, obtener, actualizar y eliminar actividades.
-5. Recibir entradas mediante opciones de terminal o JSON donde corresponda.
-6. Producir salidas textuales y JSON estables.
+4. Crear, listar, contar, obtener, actualizar y eliminar actividades.
+5. Recibir entradas estructuradas mediante JSON donde corresponda.
+6. Producir salidas JSON estables.
 7. Aplicar automaticamente migraciones internas pendientes.
 8. Informar validaciones, recursos inexistentes y errores de base con codigos
    de salida consistentes.
@@ -143,17 +144,10 @@ dbox anidado de forma deliberada.
 4. No eliminar, truncar, reemplazar ni sobrescribir una base existente.
 5. Poder ejecutarse repetidamente sin alterar datos ya persistidos.
 
-Sus mensajes textuales son:
-
-```text
-Database initialized: .dbox/data.db
-Database already initialized: .dbox/data.db
-Database migrated: .dbox/data.db
-```
-
-El primero se usa para una base inexistente, el segundo para una base que ya
-estaba actualizada y el tercero para una base existente que tenia migraciones
-pendientes.
+Su respuesta es siempre un objeto JSON con `database: ".dbox/data.db"` y uno
+de los estados `initialized`, `already_initialized` o `migrated`. El primero se
+usa para una base inexistente, el segundo para una base actualizada y el tercero
+para una base existente con migraciones pendientes.
 
 ### Descubrimiento de la base
 
@@ -161,10 +155,11 @@ Todo comando excepto `init` debe resolver una base antes de hacer su trabajo:
 
 ```bash
 dbox activity schema
-dbox activity add --type research --title "Evaluacion"
+dbox activity add --json '{"type":"research","title":"Evaluacion"}'
 dbox activity list
+dbox activity count
 dbox activity get 1
-dbox activity update 1 --status completed
+dbox activity update 1 --json '{"status":"completed"}'
 dbox activity delete 1
 ```
 
@@ -337,247 +332,73 @@ validador, el contexto EF Core y el comando `activity schema`.
 
 ## Contrato de la CLI
 
-La ayuda de `dbox --help`, `dbox activity --help` y el contrato de
-`dbox activity schema --json` deben bastar para que un agente descubra y use la
-herramienta sin conocer previamente la base.
+La ayuda textual de `dbox --help` y `dbox activity --help`, junto con el
+contrato JSON de `dbox activity schema`, deben bastar para descubrir y usar la
+herramienta. No existe `--database`, `--output`, ni un alias `--schema`.
 
-Todos los comandos que producen datos aceptan `--output text` o
-`--output json`. `text` es el valor predeterminado. Los mensajes de ayuda
-pueden ser proporcionados por `System.CommandLine`.
+Toda operacion exitosa escribe exactamente un valor JSON en `stdout`. Todo error
+operacional o de sintaxis escribe exactamente un objeto JSON en `stderr`, sin
+texto adicional en `stdout`. `--help` es la unica salida humana y no consulta
+la base de datos.
 
-No existe `--database`. La ubicacion siempre se resuelve con el algoritmo de
-proyecto local descrito anteriormente.
-
-### init
+### init y activity schema
 
 ```bash
 dbox init
-dbox init --output json
-```
-
-Inicializa exclusivamente el directorio actual y aplica migraciones. Es
-idempotente y nunca borra datos existentes.
-
-La respuesta JSON debe ser un objeto estable que indique la ruta relativa y el
-resultado, por ejemplo:
-
-```json
-{
-  "database": ".dbox/data.db",
-  "status": "initialized"
-}
-```
-
-Los valores posibles de `status` son `initialized`, `already_initialized` y
-`migrated`.
-
-### activity schema y alias --schema
-
-```bash
 dbox activity schema
-dbox activity schema --json
-dbox activity --schema
-dbox activity --schema --json
 ```
 
-`activity --schema` es un alias funcional de `activity schema`. Ambos resuelven
-primero la base de proyecto, aplican migraciones y luego muestran el contrato
-publico. `dbox --schema` no es valido porque la raiz no expone contratos de
-catalogos. El comando no debe exponer directamente `PRAGMA table_info` ni
-detalles internos de EF Core.
+`init` inicializa exclusivamente el directorio actual y devuelve un objeto con
+`database: ".dbox/data.db"` y estado `initialized`, `already_initialized` o
+`migrated`. `activity schema` resuelve la base, aplica migraciones y devuelve el
+contrato JSON estable bajo `entities.activity.fields`; no expone detalles de
+SQLite o EF Core.
 
-La salida humana debe presentar la entidad y sus reglas de forma legible. La
-salida JSON debe mantener esta forma estable:
-
-```json
-{
-  "entities": {
-    "activity": {
-      "fields": {
-        "id": {
-          "type": "integer",
-          "generated": true,
-          "mutable": false
-        },
-        "created_at": {
-          "type": "datetime",
-          "generated": true,
-          "mutable": false
-        },
-        "type": {
-          "type": "string",
-          "required": true,
-          "enum": [
-            "research",
-            "implementation",
-            "bugfix",
-            "maintenance"
-          ]
-        },
-        "title": {
-          "type": "string",
-          "required": true,
-          "maxLength": 200
-        },
-        "description": {
-          "type": "string",
-          "required": false
-        },
-        "status": {
-          "type": "string",
-          "required": true,
-          "default": "completed",
-          "enum": [
-            "pending",
-            "in_progress",
-            "completed"
-          ]
-        }
-      }
-    }
-  }
-}
-```
-
-### activity add
-
-La creacion admite opciones o un objeto JSON, pero no una mezcla de ambas
-formas de entrada.
+### activity add y update
 
 ```bash
-dbox activity add \
-  --type implementation \
-  --title "Implementa refresh token" \
-  --description "Se agrega renovacion mediante cookie HttpOnly" \
-  --status completed
-
-dbox activity add --json '{
-  "type": "implementation",
-  "title": "Implementa refresh token",
-  "description": "Se agrega renovacion mediante cookie HttpOnly",
-  "status": "completed"
-}'
+dbox activity add --json '{"type":"implementation","title":"Implementa refresh token"}'
+dbox activity update 15 --json '{"status":"completed","title":"Nuevo titulo"}'
 ```
 
-`type` y `title` son obligatorios. Si `status` esta ausente, se usa
-`completed`. `id` y `created_at` no se aceptan como entrada. Un objeto JSON
-con propiedades desconocidas o de solo lectura se rechaza como error de
-validacion.
+`--json` es obligatorio en `add` y `update`. Los objetos de entrada aceptan
+solo campos modificables; `type` y `title` son obligatorios al crear, `status`
+usa `completed` por defecto, y `description: null` limpia la descripcion al
+actualizar. Las opciones de campos individuales, propiedades desconocidas,
+`id` y `created_at` se rechazan.
 
-La actividad creada se devuelve en la salida seleccionada. En JSON su forma es:
-
-```json
-{
-  "id": 15,
-  "created_at": "2026-08-20T11:30:00Z",
-  "type": "implementation",
-  "title": "Implementa refresh token",
-  "description": "Se agrega renovacion mediante cookie HttpOnly",
-  "status": "completed"
-}
-```
-
-### activity list
+### activity list y count
 
 ```bash
 dbox activity list
-dbox activity list --type research
-dbox activity list --status completed
-dbox activity list --type research --status completed --output json
+dbox activity list --json '{"type":"research","status":"completed"}'
+dbox activity list --skip 10 --take 10
+dbox activity count
+dbox activity count --json '{"type":"research"}'
 ```
 
-Las actividades se ordenan siempre por `id DESC`. Los filtros `--type` y
-`--status` son opcionales y combinables. El resultado JSON es siempre un
-arreglo, incluso cuando no hay actividades:
+`--json` es opcional en `list` y `count`; cuando se proporciona, acepta
+unicamente filtros `type` y `status`. `list` devuelve un arreglo JSON ordenado
+por `created_at ASC` y luego `id ASC`; aplica `--skip` y `--take`, ambos
+enteros no negativos, despues del ordenamiento. `count` devuelve un objeto
+`{ "count": <integer> }` y aplica los mismos filtros sin paginacion.
 
-```json
-[]
-```
-
-La salida humana usa una tabla con `ID`, `CREATED_AT`, `TYPE`, `STATUS` y
-`TITLE`.
-
-### activity get
+### activity get y delete
 
 ```bash
 dbox activity get 15
-dbox activity get 15 --output json
-```
-
-Devuelve todos los campos de la actividad. Si no existe, muestra:
-
-```text
-Activity 15 not found.
-```
-
-y retorna exit code `3`.
-
-### activity update
-
-```bash
-dbox activity update 15 --status completed
-
-dbox activity update 15 --json '{
-  "status": "completed",
-  "title": "Nuevo titulo"
-}'
-```
-
-Solo se pueden modificar `type`, `title`, `description` y `status`. Se
-actualizan exclusivamente los campos proporcionados. `description: null` en
-JSON limpia la descripcion; su ausencia no la modifica. Los demas campos no
-aceptan `null`.
-
-La actualizacion debe contener al menos un campo modificable. Se aplican las
-mismas reglas de validacion que en `activity add`. `id` y `created_at` permanecen sin
-cambios. La respuesta exitosa devuelve la actividad completa actualizada.
-
-### activity delete
-
-```bash
 dbox activity delete 15
-dbox activity delete 15 --output json
 ```
 
-No solicita confirmacion interactiva. Si la actividad existe, la elimina y
-escribe:
-
-```text
-Activity 15 deleted.
-```
-
-Su respuesta JSON estable es:
-
-```json
-{
-  "id": 15,
-  "deleted": true
-}
-```
-
-Si no existe, devuelve el mismo error y exit code que `activity get`.
+Los IDs permanecen como argumentos posicionales. `get` devuelve la actividad
+completa y `delete` devuelve `{ "id": 15, "deleted": true }`.
 
 ## Validacion y errores
 
 Toda la validacion de entradas ocurre antes de ejecutar `SaveChangesAsync()`.
 Los errores de validacion son resultados esperados del contrato, no
-excepciones usadas como flujo normal.
-
-Ejemplo humano:
-
-```text
-Validation error:
-
-type must be one of:
-  research
-  implementation
-  bugfix
-  maintenance
-```
-
-Los errores se escriben en `stderr`. Cuando se selecciona `--output json`, se
-escribe exclusivamente un objeto JSON valido en `stderr`, sin texto adicional
-en `stdout`:
+excepciones usadas como flujo normal. Los errores se escriben exclusivamente en
+`stderr` como un objeto JSON valido:
 
 ```json
 {
@@ -612,8 +433,8 @@ Los exit codes minimos son:
 | `3` | Recurso solicitado no encontrado. |
 | `4` | Base no encontrada, migracion fallida o error de base de datos. |
 
-Las salidas exitosas se escriben en `stdout`. Una salida JSON exitosa no debe
-incluir encabezados, mensajes auxiliares ni texto de diagnostico.
+Las salidas exitosas se escriben en `stdout` y no incluyen encabezados,
+mensajes auxiliares ni texto de diagnostico.
 
 ## Arquitectura futura minima
 
@@ -642,6 +463,8 @@ src/
     │       │   └── AddCommand.cs
     │       ├── List/
     │       │   └── ListCommand.cs
+    │       ├── Count/
+    │       │   └── CountCommand.cs
     │       ├── Get/
     │       │   └── GetCommand.cs
     │       ├── Update/
@@ -663,7 +486,6 @@ src/
     │   ├── DboxDatabase.cs
     │   └── Migrations/
     └── Output/
-        ├── OutputFormat.cs
         ├── OutputWriter.cs
         ├── InitResponse.cs
         └── DeleteResponse.cs
@@ -717,10 +539,11 @@ Como minimo se deben cubrir:
 - ausencia de `.dbox/data.db` devuelve el mensaje y exit code definidos;
 - una `.dbox` incompleta bloquea la busqueda hacia un ancestro;
 - las migraciones pendientes se aplican antes de cada comando que usa base;
-- `activity schema` humano y JSON reflejan enums, requeridos y mutabilidad;
+- `activity schema` JSON refleja enums, requeridos y mutabilidad;
 - `activity add` crea una actividad valida y aplica el status por defecto;
 - `activity add` rechaza enum invalido, titulo vacio y titulo de mas de 200 caracteres;
-- `activity list` ordena por `id DESC`, filtra y produce un arreglo JSON valido;
+- `activity list` ordena por `created_at ASC` e `id ASC`, filtra, pagina y produce un arreglo JSON valido;
+- `activity count` cuenta todos los registros o los que coinciden con filtros JSON;
 - `activity get` encuentra registros y devuelve not found correctamente;
 - `activity update` cambia solo campos enviados y conserva `id` y `created_at`;
 - `activity delete` elimina registros y maneja not found;
@@ -736,30 +559,27 @@ dbox init
 
 dbox activity schema
 
-dbox activity add \
-  --type implementation \
-  --title "Primera actividad"
+dbox activity add --json '{"type":"implementation","title":"Primera actividad"}'
 
 dbox activity list
 
 dbox activity get 1
 
-dbox activity update 1 \
-  --status completed
+dbox activity update 1 --json '{"status":"completed"}'
 
 dbox activity delete 1
 ```
 
-Y cuando el flujo JSON equivalente sea valido para scripts y agentes:
+El mismo flujo JSON es valido para scripts y agentes:
 
 ```bash
-dbox activity schema --json
+dbox activity schema
 
-dbox activity add \
-  --json '{"type":"research","title":"Prueba"}' \
-  --output json
+dbox activity add --json '{"type":"research","title":"Prueba"}'
 
-dbox activity list --status completed --output json
+dbox activity count --json '{"status":"completed"}'
+
+dbox activity list --json '{"status":"completed"}' --skip 0 --take 10
 ```
 
 La validacion final debera incluir compilacion, ejecucion de todas las pruebas

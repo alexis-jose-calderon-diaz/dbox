@@ -37,22 +37,21 @@ The system SHALL expose exactly the fixed `activity` contract with the public fi
 
 ### Requirement: Schema discovery command
 
-The system SHALL provide `dbox activity schema` and `dbox activity --schema` as equivalent commands that resolve the project database, apply pending migrations, and expose the public activity contract without exposing SQLite or EF Core internals.
+The system SHALL provide only `dbox activity schema` to resolve the project
+database, apply pending migrations, and expose the public activity contract.
+The command SHALL return the stable JSON contract under
+`entities.activity.fields` without SQLite or EF Core internals or auxiliary
+text.
 
-#### Scenario: Request the human schema
+#### Scenario: Request the activity schema
 
 - **WHEN** a user runs `dbox activity schema`
-- **THEN** the system prints a readable description of the `activity` entity and its rules
+- **THEN** stdout contains the stable JSON activity contract under `entities.activity.fields`
 
-#### Scenario: Request the JSON schema
+#### Scenario: Reject schema format and alias options
 
-- **WHEN** a user runs `dbox activity schema --json` or `dbox activity --schema --json`
-- **THEN** the system prints the stable JSON contract under `entities.activity.fields` with no database introspection details or auxiliary text
-
-#### Scenario: Use the schema alias
-
-- **WHEN** a user runs `dbox activity --schema` or `dbox activity --schema --json`
-- **THEN** the system behaves exactly as the corresponding `dbox activity schema` command
+- **WHEN** a user runs `dbox activity schema --json` or `dbox activity --schema`
+- **THEN** the system returns the JSON command syntax validation error defined by the CLI contract
 
 ### Requirement: Consistent activity validation
 
