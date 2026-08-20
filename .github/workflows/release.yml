@@ -1,0 +1,57 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.rid }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            executable: dbox
+            asset: dbox-linux-x64
+          - rid: linux-arm64
+            executable: dbox
+            asset: dbox-linux-arm64
+          - rid: win-x64
+            executable: dbox.exe
+            asset: dbox-win-x64.exe
+          - rid: osx-x64
+            executable: dbox
+            asset: dbox-osx-x64
+          - rid: osx-arm64
+            executable: dbox
+            asset: dbox-osx-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet publish src/Dbox/Dbox.csproj --configuration Release --runtime "${{ matrix.rid }}" --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false --output publish
+      - run: mv "publish/${{ matrix.executable }}" "${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release-assets/* --generate-notes
