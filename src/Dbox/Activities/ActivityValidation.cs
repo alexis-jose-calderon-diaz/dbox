@@ -6,10 +6,15 @@ public static class ActivityValidator
     {
         var issues = new List<ValidationIssue>();
 
-        ValidateEnum(input.Type, input.TypeProvided, ActivitySchema.Field("type"), issues);
+        ValidateString(input.Type, input.TypeProvided, ActivitySchema.Field("type"), issues);
         ValidateTitle(input.Title, input.TitleProvided, issues);
-
-        ValidateEnum(input.Status, input.StatusProvided, ActivitySchema.Field("status"), issues, requiredWhenMissing: false);
+        ValidateEnum(input.Status, input.StatusProvided, ActivitySchema.Field("status"), issues);
+        ValidateString(input.Description, input.DescriptionProvided, ActivitySchema.Field("description"), issues);
+        ValidateString(input.Source, input.SourceProvided, ActivitySchema.Field("source"), issues);
+        ValidateString(input.Area, input.AreaProvided, ActivitySchema.Field("area"), issues);
+        ValidateString(input.Result, input.ResultProvided, ActivitySchema.Field("result"), issues);
+        ValidateString(input.Impact, input.ImpactProvided, ActivitySchema.Field("impact"), issues);
+        ValidateEnum(input.Effort, input.EffortProvided, ActivitySchema.Field("effort"), issues);
 
         return new ValidationResult(issues);
     }
@@ -25,7 +30,7 @@ public static class ActivityValidator
 
         if (input.TypeProvided)
         {
-            ValidateEnum(input.Type, provided: true, ActivitySchema.Field("type"), issues);
+            ValidateString(input.Type, provided: true, ActivitySchema.Field("type"), issues);
         }
 
         if (input.TitleProvided)
@@ -33,9 +38,39 @@ public static class ActivityValidator
             ValidateTitle(input.Title, provided: true, issues);
         }
 
+        if (input.DescriptionProvided)
+        {
+            ValidateString(input.Description, provided: true, ActivitySchema.Field("description"), issues);
+        }
+
         if (input.StatusProvided)
         {
-            ValidateEnum(input.Status, provided: true, ActivitySchema.Field("status"), issues, requiredWhenMissing: false);
+            ValidateEnum(input.Status, provided: true, ActivitySchema.Field("status"), issues);
+        }
+
+        if (input.SourceProvided)
+        {
+            ValidateString(input.Source, provided: true, ActivitySchema.Field("source"), issues);
+        }
+
+        if (input.AreaProvided)
+        {
+            ValidateString(input.Area, provided: true, ActivitySchema.Field("area"), issues);
+        }
+
+        if (input.ResultProvided)
+        {
+            ValidateString(input.Result, provided: true, ActivitySchema.Field("result"), issues);
+        }
+
+        if (input.ImpactProvided)
+        {
+            ValidateString(input.Impact, provided: true, ActivitySchema.Field("impact"), issues);
+        }
+
+        if (input.EffortProvided)
+        {
+            ValidateEnum(input.Effort, provided: true, ActivitySchema.Field("effort"), issues);
         }
 
         return new ValidationResult(issues);
@@ -44,9 +79,9 @@ public static class ActivityValidator
     public static ValidationResult ValidateFilter(ActivityFilter filter)
     {
         var issues = new List<ValidationIssue>();
-        if (filter.Type is not null && !ActivitySchema.IsType(filter.Type))
+        if (filter.Type is not null && string.IsNullOrWhiteSpace(filter.Type))
         {
-            issues.Add(new ValidationIssue("type", $"Value must be one of: {string.Join(", ", ActivitySchema.Types)}."));
+            issues.Add(new ValidationIssue("type", "Field must be a non-blank value."));
         }
 
         if (filter.Status is not null && !ActivitySchema.IsStatus(filter.Status))
@@ -57,20 +92,35 @@ public static class ActivityValidator
         return new ValidationResult(issues);
     }
 
+    private static void ValidateString(
+        string? value,
+        bool provided,
+        ActivityFieldDefinition field,
+        ICollection<ValidationIssue> issues)
+    {
+        if (!provided || value is null || (field.NonBlank && string.IsNullOrWhiteSpace(value)))
+        {
+            issues.Add(new ValidationIssue(field.Name, "Field must be a non-blank value."));
+            return;
+        }
+
+        if (field.MaxLength is { } maxLength && value.Length > maxLength)
+        {
+            issues.Add(new ValidationIssue(
+                field.Name,
+                $"Value must be at most {maxLength} characters."));
+        }
+    }
+
     private static void ValidateEnum(
         string? value,
         bool provided,
         ActivityFieldDefinition field,
-        ICollection<ValidationIssue> issues,
-        bool requiredWhenMissing = true)
+        ICollection<ValidationIssue> issues)
     {
-        if ((!provided && requiredWhenMissing) || string.IsNullOrEmpty(value))
+        if (!provided || value is null || (field.NonBlank && string.IsNullOrWhiteSpace(value)))
         {
-            if (requiredWhenMissing || provided)
-            {
-                issues.Add(new ValidationIssue(field.Name, "Field is required."));
-            }
-
+            issues.Add(new ValidationIssue(field.Name, "Field must be a non-blank value."));
             return;
         }
 
@@ -85,17 +135,6 @@ public static class ActivityValidator
     private static void ValidateTitle(string? value, bool provided, ICollection<ValidationIssue> issues)
     {
         var field = ActivitySchema.Field("title");
-        if (!provided || value is null || (field.NonBlank && string.IsNullOrWhiteSpace(value)))
-        {
-            issues.Add(new ValidationIssue(field.Name, "Field must be a non-blank value."));
-            return;
-        }
-
-        if (field.MaxLength is { } maxLength && value.Length > maxLength)
-        {
-            issues.Add(new ValidationIssue(
-                field.Name,
-                $"Value must be at most {maxLength} characters."));
-        }
+        ValidateString(value, provided, field, issues);
     }
 }

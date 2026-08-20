@@ -39,8 +39,15 @@ public static class AddCommand
         {
             Type = input.Value!.Type!,
             Title = input.Value.Title!,
-            Description = input.Value.Description,
-            Status = input.Value.Status ?? ActivitySchema.DefaultStatus,
+            Description = input.Value.Description!,
+            Status = input.Value.Status!,
+            Source = input.Value.Source!,
+            Area = input.Value.Area!,
+            Result = input.Value.Result!,
+            Impact = input.Value.Impact!,
+            Effort = input.Value.Effort!,
+            Reference = input.Value.Reference,
+            Metadata = input.Value.Metadata,
             CreatedAt = DateTime.UtcNow
         };
 

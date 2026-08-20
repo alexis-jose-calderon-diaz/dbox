@@ -16,22 +16,22 @@ public sealed class ActivityCrudTests
             "activity",
             "add",
             "--json",
-            "{\"type\":\"research\",\"title\":\"Investigate\"}");
+            "{\"type\":\"feature\",\"title\":\"Investigate\",\"description\":\"Details\",\"status\":\"completed\",\"source\":\"openspec\",\"area\":\"backend\",\"result\":\"Feature result\",\"impact\":\"Feature impact\",\"effort\":\"medium\",\"reference\":\"commit 74aa316ac\",\"metadata\":{\"openspec\":\"activity-contract\",\"commits\":[\"74aa316ac\"]}}");
         var secondAdd = await TestProject.RunAsync(
             project.Root,
             "activity",
             "add",
             "--json",
-            "{\"type\":\"implementation\",\"title\":\"Build\",\"description\":\"Details\",\"status\":\"pending\"}");
+            "{\"type\":\"refactor\",\"title\":\"Build\",\"description\":\"Details\",\"status\":\"pending\",\"source\":\"manual\",\"area\":\"backend\",\"result\":\"Refactor result\",\"impact\":\"Refactor impact\",\"effort\":\"high\"}");
         var list = await TestProject.RunAsync(project.Root, "activity", "list");
-        var filteredList = await TestProject.RunAsync(project.Root, "activity", "list", "--json", "{\"type\":\"implementation\",\"status\":\"pending\"}");
+        var filteredList = await TestProject.RunAsync(project.Root, "activity", "list", "--json", "{\"type\":\"refactor\",\"status\":\"pending\"}");
         var update = await TestProject.RunAsync(
             project.Root,
             "activity",
             "update",
             "1",
             "--json",
-            "{\"description\":null,\"status\":\"completed\"}");
+            "{\"description\":\"Updated details\",\"result\":\"Updated result\",\"reference\":null,\"metadata\":null}");
         var get = await TestProject.RunAsync(project.Root, "activity", "get", "1");
         var emptyUpdate = await TestProject.RunAsync(project.Root, "activity", "update", "1");
         var optionUpdate = await TestProject.RunAsync(
@@ -57,6 +57,8 @@ public sealed class ActivityCrudTests
 
         Assert.Equal(0, firstAdd.ExitCode);
         Assert.Contains("\"status\": \"completed\"", firstAdd.Output);
+        Assert.Equal("activity-contract", firstAddDocument.RootElement.GetProperty("metadata").GetProperty("openspec").GetString());
+        Assert.Equal("commit 74aa316ac", firstAddDocument.RootElement.GetProperty("reference").GetString());
         Assert.Matches(
             "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
             firstAddDocument.RootElement.GetProperty("created_at").GetString());
@@ -69,11 +71,14 @@ public sealed class ActivityCrudTests
         Assert.Equal(1, filteredDocument.RootElement.GetArrayLength());
         Assert.Equal("Build", filteredDocument.RootElement[0].GetProperty("title").GetString());
         Assert.Equal(0, update.ExitCode);
-        Assert.Contains("\"description\": null", update.Output);
+        Assert.Contains("\"description\": \"Updated details\"", update.Output);
         Assert.Equal(0, get.ExitCode);
         Assert.Equal("Investigate", getDocument.RootElement.GetProperty("title").GetString());
         Assert.Equal("completed", getDocument.RootElement.GetProperty("status").GetString());
-        Assert.True(getDocument.RootElement.GetProperty("description").ValueKind == JsonValueKind.Null);
+        Assert.Equal("Updated details", getDocument.RootElement.GetProperty("description").GetString());
+        Assert.Equal("Updated result", getDocument.RootElement.GetProperty("result").GetString());
+        Assert.Equal(JsonValueKind.Null, getDocument.RootElement.GetProperty("reference").ValueKind);
+        Assert.Equal(JsonValueKind.Null, getDocument.RootElement.GetProperty("metadata").ValueKind);
         Assert.Equal(2, emptyUpdate.ExitCode);
         Assert.Equal(0, optionUpdate.ExitCode);
         Assert.Contains("\"status\": \"in_progress\"", optionUpdate.Output);

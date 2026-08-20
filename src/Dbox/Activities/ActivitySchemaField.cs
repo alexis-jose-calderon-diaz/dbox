@@ -4,23 +4,25 @@ namespace Dbox.Activities;
 
 public sealed class ActivitySchemaField
 {
+    [JsonPropertyName("name")]
+    [JsonPropertyOrder(0)]
+    public string Name { get; init; } = string.Empty;
+
     [JsonPropertyName("type")]
+    [JsonPropertyOrder(1)]
     public string Type { get; init; } = string.Empty;
 
     [JsonPropertyName("required")]
-    [JsonPropertyOrder(1)]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? Required { get; init; }
+    [JsonPropertyOrder(2)]
+    public bool Required { get; init; }
 
     [JsonPropertyName("generated")]
-    [JsonPropertyOrder(2)]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? Generated { get; init; }
+    [JsonPropertyOrder(3)]
+    public bool Generated { get; init; }
 
     [JsonPropertyName("mutable")]
-    [JsonPropertyOrder(3)]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? Mutable { get; init; }
+    [JsonPropertyOrder(4)]
+    public bool Mutable { get; init; }
 
     [JsonPropertyName("enum")]
     [JsonPropertyOrder(5)]
@@ -32,8 +34,13 @@ public sealed class ActivitySchemaField
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MaxLength { get; init; }
 
-    [JsonPropertyName("default")]
-    [JsonPropertyOrder(4)]
+    [JsonPropertyName("nullable")]
+    [JsonPropertyOrder(7)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Default { get; init; }
+    public bool? Nullable { get; init; }
+
+    [JsonPropertyName("description")]
+    [JsonPropertyOrder(8)]
+    public string Description { get; init; } = string.Empty;
+
 }

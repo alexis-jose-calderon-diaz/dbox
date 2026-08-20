@@ -10,7 +10,7 @@ public sealed class InitCommandTests
         using var project = new TestProject();
 
         var firstInit = await TestProject.RunAsync(project.Root, "init");
-        var add = await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"implementation\",\"title\":\"Keep me\"}");
+        var add = await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"implementation\",\"title\":\"Keep me\",\"description\":\"Preserve this activity\",\"status\":\"completed\",\"source\":\"manual\",\"area\":\"backend\",\"result\":\"Activity preserved\",\"impact\":\"Keeps data stable\",\"effort\":\"low\"}");
         var secondInit = await TestProject.RunAsync(project.Root, "init");
         var list = await TestProject.RunAsync(project.Root, "activity", "list");
 
@@ -31,7 +31,7 @@ public sealed class InitCommandTests
         var child = project.CreateChild();
 
         await TestProject.RunAsync(project.Root, "init");
-        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Parent\"}");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Parent\",\"description\":\"Parent details\",\"status\":\"completed\",\"source\":\"manual\",\"area\":\"backend\",\"result\":\"Parent result\",\"impact\":\"Parent impact\",\"effort\":\"low\"}");
         var childInit = await TestProject.RunAsync(child, "init");
         var childList = await TestProject.RunAsync(child, "activity", "list");
         var parentList = await TestProject.RunAsync(project.Root, "activity", "list");

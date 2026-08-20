@@ -63,12 +63,47 @@ public sealed class ActivityRepository
 
         if (input.DescriptionProvided)
         {
-            activity.Description = input.Description;
+            activity.Description = input.Description!;
         }
 
         if (input.StatusProvided)
         {
             activity.Status = input.Status!;
+        }
+
+        if (input.SourceProvided)
+        {
+            activity.Source = input.Source!;
+        }
+
+        if (input.AreaProvided)
+        {
+            activity.Area = input.Area!;
+        }
+
+        if (input.ResultProvided)
+        {
+            activity.Result = input.Result!;
+        }
+
+        if (input.ImpactProvided)
+        {
+            activity.Impact = input.Impact!;
+        }
+
+        if (input.EffortProvided)
+        {
+            activity.Effort = input.Effort!;
+        }
+
+        if (input.ReferenceProvided)
+        {
+            activity.Reference = input.Reference;
+        }
+
+        if (input.MetadataProvided)
+        {
+            activity.Metadata = input.Metadata;
         }
 
         await context.SaveChangesAsync(cancellationToken);

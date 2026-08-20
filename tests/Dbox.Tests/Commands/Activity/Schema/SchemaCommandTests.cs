@@ -24,12 +24,24 @@ public sealed class SchemaCommandTests
         Assert.Empty(formatOption.Output);
         Assert.Contains("validation_error", alias.Error);
         Assert.Contains("validation_error", formatOption.Error);
+        Assert.Equal(13, fields.EnumerateObject().Count());
+        Assert.Equal("id", fields.GetProperty("id").GetProperty("name").GetString());
+        Assert.Equal("integer", fields.GetProperty("id").GetProperty("type").GetString());
         Assert.Equal(200, fields.GetProperty("title").GetProperty("maxLength").GetInt32());
-        Assert.False(fields.GetProperty("id").TryGetProperty("required", out _));
+        Assert.False(fields.GetProperty("id").GetProperty("required").GetBoolean());
         Assert.True(fields.GetProperty("id").GetProperty("generated").GetBoolean());
         Assert.False(fields.GetProperty("id").GetProperty("mutable").GetBoolean());
+        Assert.False(fields.GetProperty("created_at").GetProperty("required").GetBoolean());
         Assert.True(fields.GetProperty("created_at").GetProperty("generated").GetBoolean());
-        Assert.Equal("completed", fields.GetProperty("status").GetProperty("default").GetString());
-        Assert.Equal("research", fields.GetProperty("type").GetProperty("enum")[0].GetString());
+        Assert.True(fields.GetProperty("description").GetProperty("required").GetBoolean());
+        Assert.Equal("Descripcion de lo realizado.", fields.GetProperty("description").GetProperty("description").GetString());
+        Assert.False(fields.GetProperty("type").TryGetProperty("enum", out _));
+        Assert.Equal("pending", fields.GetProperty("status").GetProperty("enum")[0].GetString());
+        Assert.False(fields.GetProperty("status").TryGetProperty("default", out _));
+        Assert.Equal("low", fields.GetProperty("effort").GetProperty("enum")[0].GetString());
+        Assert.Equal("very-high", fields.GetProperty("effort").GetProperty("enum")[3].GetString());
+        Assert.Equal("json", fields.GetProperty("metadata").GetProperty("type").GetString());
+        Assert.False(fields.GetProperty("metadata").GetProperty("required").GetBoolean());
+        Assert.True(fields.GetProperty("metadata").GetProperty("nullable").GetBoolean());
     }
 }

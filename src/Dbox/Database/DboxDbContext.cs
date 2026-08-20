@@ -18,6 +18,13 @@ public sealed class DboxDbContext(DbContextOptions<DboxDbContext> options) : DbC
         var title = ActivitySchema.Field("title");
         var description = ActivitySchema.Field("description");
         var status = ActivitySchema.Field("status");
+        var source = ActivitySchema.Field("source");
+        var area = ActivitySchema.Field("area");
+        var result = ActivitySchema.Field("result");
+        var impact = ActivitySchema.Field("impact");
+        var effort = ActivitySchema.Field("effort");
+        var reference = ActivitySchema.Field("reference");
+        var metadata = ActivitySchema.Field("metadata");
 
         activity.Property(item => item.Id)
             .HasColumnName(id.Name)
@@ -44,5 +51,34 @@ public sealed class DboxDbContext(DbContextOptions<DboxDbContext> options) : DbC
         activity.Property(item => item.Status)
             .HasColumnName(status.Name)
             .IsRequired(status.Required);
+
+        activity.Property(item => item.Source)
+            .HasColumnName(source.Name)
+            .IsRequired(source.Required);
+
+        activity.Property(item => item.Area)
+            .HasColumnName(area.Name)
+            .IsRequired(area.Required);
+
+        activity.Property(item => item.Result)
+            .HasColumnName(result.Name)
+            .IsRequired(result.Required);
+
+        activity.Property(item => item.Impact)
+            .HasColumnName(impact.Name)
+            .IsRequired(impact.Required);
+
+        activity.Property(item => item.Effort)
+            .HasColumnName(effort.Name)
+            .IsRequired(effort.Required);
+
+        activity.Property(item => item.Reference)
+            .HasColumnName(reference.Name)
+            .IsRequired(reference.Required);
+
+        activity.Property(item => item.Metadata)
+            .HasColumnName(metadata.Name)
+            .HasColumnType("TEXT")
+            .IsRequired(metadata.Required);
     }
 }

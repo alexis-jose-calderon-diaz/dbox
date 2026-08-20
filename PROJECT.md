@@ -155,11 +155,11 @@ Todo comando excepto `init` debe resolver una base antes de hacer su trabajo:
 
 ```bash
 dbox activity schema
-dbox activity add --json '{"type":"research","title":"Evaluacion"}'
+dbox activity add --json '{"type":"research","title":"Evaluacion","description":"Evalua una alternativa","status":"completed","source":"research","area":"backend","result":"La alternativa queda evaluada","impact":"Reduce incertidumbre","effort":"low"}'
 dbox activity list
 dbox activity count
 dbox activity get 1
-dbox activity update 1 --json '{"status":"completed"}'
+dbox activity update 1 --json '{"result":"La actividad queda actualizada"}'
 dbox activity delete 1
 ```
 
@@ -290,8 +290,15 @@ CREATE TABLE activities (
     created_at TEXT NOT NULL,
     type TEXT NOT NULL,
     title TEXT NOT NULL,
-    description TEXT NULL,
-    status TEXT NOT NULL
+    description TEXT NOT NULL,
+    status TEXT NOT NULL,
+    source TEXT NOT NULL,
+    area TEXT NOT NULL,
+    result TEXT NOT NULL,
+    impact TEXT NOT NULL,
+    effort TEXT NOT NULL,
+    reference TEXT NULL,
+    metadata TEXT NULL
 );
 ```
 
@@ -302,16 +309,24 @@ modelo debe preservar estos nombres de tabla y columnas.
 
 | Campo | Tipo publico | Requerido | Generado | Modificable | Regla |
 | --- | --- | --- | --- | --- | --- |
-| `id` | integer | si | si | no | Entero autogenerado por SQLite. |
-| `created_at` | datetime | si | si | no | Generado al crear en UTC, con formato ISO 8601 `YYYY-MM-DDTHH:mm:ssZ`. |
-| `type` | string | si | no | si | Uno de `research`, `implementation`, `bugfix`, `maintenance`. |
+| `id` | integer | no | si | no | Entero autogenerado por SQLite. |
+| `created_at` | datetime | no | si | no | Generado al crear en UTC, con formato ISO 8601 `YYYY-MM-DDTHH:mm:ssZ`. |
+| `type` | string | si | no | si | Texto no vacio y extensible; los valores de ejemplo incluyen `feature`, `improvement`, `refactor`, `maintenance`, `infrastructure`, `research` y `fix`. |
 | `title` | string | si | no | si | Texto no vacio de hasta 200 caracteres. |
-| `description` | string | no | no | si | Texto opcional; puede ser `null`. |
-| `status` | string | si | no | si | Uno de `pending`, `in_progress`, `completed`; el valor por defecto es `completed`. |
+| `description` | string | si | no | si | Texto no vacio que describe la actividad. |
+| `status` | string | si | no | si | Uno de `pending`, `in_progress`, `completed`; debe recibirse explicitamente al crear. |
+| `source` | string | si | no | si | Texto no vacio sobre el origen o motivacion; los valores de ejemplo incluyen `openspec`, `opencode`, `manual`, `git`, `issue` y `research`. |
+| `area` | string | si | no | si | Texto no vacio y extensible sobre el area afectada; no es un enum cerrado. |
+| `result` | string | si | no | si | Resultado concreto obtenido despues de la actividad. |
+| `impact` | string | si | no | si | Mejora, beneficio o consecuencia producida. |
+| `effort` | string | si | no | si | Uno de `low`, `medium`, `high`, `very-high`. |
+| `reference` | string | no | no | si | Referencia textual opcional hacia informacion relacionada. |
+| `metadata` | json | no | no | si | Objeto JSON opcional con informacion adicional extensible; no reemplaza los campos principales. |
 
-Los valores de `type` y `status` son sensibles a mayusculas y deben usarse
-exactamente como se declaran. Un titulo formado solo por espacios se considera
-vacio. La fecha de creacion no puede ser recibida ni modificada por la CLI.
+Los valores de `status` y `effort` son sensibles a mayusculas y deben usarse
+exactamente como se declaran. Los campos obligatorios de texto formados solo
+por espacios se consideran vacios. `metadata` debe ser un objeto JSON valido o
+`null`. La fecha de creacion no puede ser recibida ni modificada por la CLI.
 
 ### Fuente unica de reglas
 
@@ -320,8 +335,7 @@ de verdad de:
 
 - los campos publicos y sus metadatos;
 - campos generados y mutables;
-- valores permitidos de `type` y `status`;
-- valor por defecto de `status`;
+- valores permitidos de `status` y `effort`;
 - longitud maxima de `title`;
 - validacion de entradas;
 - restricciones equivalentes de la configuracion EF Core;
@@ -357,15 +371,18 @@ SQLite o EF Core.
 ### activity add y update
 
 ```bash
-dbox activity add --json '{"type":"implementation","title":"Implementa refresh token"}'
-dbox activity update 15 --json '{"status":"completed","title":"Nuevo titulo"}'
+dbox activity add --json '{"type":"feature","title":"Implementa refresh token","description":"Agrega soporte de refresh token","status":"completed","source":"manual","area":"backend","result":"El flujo de refresh token queda disponible","impact":"Mejora la continuidad de sesion","effort":"medium"}'
+dbox activity update 15 --json '{"status":"completed","result":"El flujo queda verificado"}'
 ```
 
 `--json` es obligatorio en `add` y `update`. Los objetos de entrada aceptan
-solo campos modificables; `type` y `title` son obligatorios al crear, `status`
-usa `completed` por defecto, y `description: null` limpia la descripcion al
-actualizar. Las opciones de campos individuales, propiedades desconocidas,
-`id` y `created_at` se rechazan.
+solo campos modificables. Al crear son obligatorios `type`, `title`,
+`description`, `status`, `source`, `area`, `result`, `impact` y `effort`.
+`reference` y `metadata` son opcionales. Durante una actualizacion se pueden
+omitir campos para conservarlos; los campos obligatorios no aceptan `null` ni
+texto vacio. `reference: null` y `metadata: null` limpian esos campos. Las
+opciones de campos individuales, propiedades desconocidas, `id` y `created_at`
+se rechazan.
 
 ### activity list y count
 
@@ -407,8 +424,8 @@ excepciones usadas como flujo normal. Los errores se escriben exclusivamente en
     "message": "Invalid activity.",
     "details": [
       {
-        "field": "type",
-        "message": "Value must be one of: research, implementation, bugfix, maintenance."
+        "field": "effort",
+        "message": "Value must be one of: low, medium, high, very-high."
       }
     ]
   }
@@ -539,9 +556,9 @@ Como minimo se deben cubrir:
 - ausencia de `.dbox/data.db` devuelve el mensaje y exit code definidos;
 - una `.dbox` incompleta bloquea la busqueda hacia un ancestro;
 - las migraciones pendientes se aplican antes de cada comando que usa base;
-- `activity schema` JSON refleja enums, requeridos y mutabilidad;
-- `activity add` crea una actividad valida y aplica el status por defecto;
-- `activity add` rechaza enum invalido, titulo vacio y titulo de mas de 200 caracteres;
+- `activity schema` JSON refleja campos, descripciones, requeridos, mutabilidad y valores controlados;
+- `activity add` crea una actividad valida con todos los campos obligatorios;
+- `activity add` rechaza campos obligatorios ausentes o vacios, enum invalido, metadata invalida y titulo de mas de 200 caracteres;
 - `activity list` ordena por `created_at ASC` e `id ASC`, filtra, pagina y produce un arreglo JSON valido;
 - `activity count` cuenta todos los registros o los que coinciden con filtros JSON;
 - `activity get` encuentra registros y devuelve not found correctamente;
@@ -559,7 +576,7 @@ dbox init
 
 dbox activity schema
 
-dbox activity add --json '{"type":"implementation","title":"Primera actividad"}'
+dbox activity add --json '{"type":"feature","title":"Primera actividad","description":"Implementa la primera actividad","status":"completed","source":"manual","area":"backend","result":"La actividad queda registrada","impact":"Aumenta la trazabilidad","effort":"low"}'
 
 dbox activity list
 
@@ -575,7 +592,7 @@ El mismo flujo JSON es valido para scripts y agentes:
 ```bash
 dbox activity schema
 
-dbox activity add --json '{"type":"research","title":"Prueba"}'
+dbox activity add --json '{"type":"research","title":"Prueba","description":"Evalua el contrato","status":"completed","source":"research","area":"infrastructure","result":"El contrato queda evaluado","impact":"Reduce ambiguedad futura","effort":"low"}'
 
 dbox activity count --json '{"status":"completed"}'
 

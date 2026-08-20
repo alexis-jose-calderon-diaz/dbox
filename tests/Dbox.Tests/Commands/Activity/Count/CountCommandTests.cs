@@ -10,12 +10,12 @@ public sealed class CountCommandTests
     {
         using var project = new TestProject();
         await TestProject.RunAsync(project.Root, "init");
-        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"First\",\"status\":\"pending\"}");
-        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"implementation\",\"title\":\"Second\"}");
-        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Third\",\"status\":\"pending\"}");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"feature\",\"title\":\"First\",\"description\":\"First details\",\"status\":\"pending\",\"source\":\"manual\",\"area\":\"backend\",\"result\":\"First result\",\"impact\":\"First impact\",\"effort\":\"low\"}");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"refactor\",\"title\":\"Second\",\"description\":\"Second details\",\"status\":\"completed\",\"source\":\"manual\",\"area\":\"backend\",\"result\":\"Second result\",\"impact\":\"Second impact\",\"effort\":\"medium\"}");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"feature\",\"title\":\"Third\",\"description\":\"Third details\",\"status\":\"pending\",\"source\":\"manual\",\"area\":\"backend\",\"result\":\"Third result\",\"impact\":\"Third impact\",\"effort\":\"high\"}");
 
         var count = await TestProject.RunAsync(project.Root, "activity", "count");
-        var filteredCount = await TestProject.RunAsync(project.Root, "activity", "count", "--json", "{\"type\":\"research\",\"status\":\"pending\"}");
+        var filteredCount = await TestProject.RunAsync(project.Root, "activity", "count", "--json", "{\"type\":\"feature\",\"status\":\"pending\"}");
         var page = await TestProject.RunAsync(project.Root, "activity", "list", "--skip", "1", "--take", "1");
         var invalidFilter = await TestProject.RunAsync(project.Root, "activity", "count", "--json", "{\"unknown\":true}");
         var invalidPagination = await TestProject.RunAsync(project.Root, "activity", "list", "--skip", "-1");

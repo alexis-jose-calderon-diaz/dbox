@@ -11,7 +11,7 @@ public sealed class ProjectDatabaseTests
         var nested = project.CreateChild("src/feature");
 
         await TestProject.RunAsync(project.Root, "init");
-        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Parent activity\"}");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Parent activity\",\"description\":\"Parent details\",\"status\":\"completed\",\"source\":\"manual\",\"area\":\"backend\",\"result\":\"Parent result\",\"impact\":\"Parent impact\",\"effort\":\"low\"}");
         var result = await TestProject.RunAsync(nested, "activity", "list");
 
         Assert.Equal(0, result.ExitCode);

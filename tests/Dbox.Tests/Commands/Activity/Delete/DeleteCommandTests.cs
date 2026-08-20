@@ -9,7 +9,7 @@ public sealed class DeleteCommandTests
     {
         using var project = new TestProject();
         await TestProject.RunAsync(project.Root, "init");
-        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Delete me\"}");
+        await TestProject.RunAsync(project.Root, "activity", "add", "--json", "{\"type\":\"research\",\"title\":\"Delete me\",\"description\":\"Delete details\",\"status\":\"completed\",\"source\":\"manual\",\"area\":\"backend\",\"result\":\"Delete result\",\"impact\":\"Delete impact\",\"effort\":\"low\"}");
 
         var deleted = await TestProject.RunAsync(project.Root, "activity", "delete", "1");
         var missing = await TestProject.RunAsync(project.Root, "activity", "get", "1");

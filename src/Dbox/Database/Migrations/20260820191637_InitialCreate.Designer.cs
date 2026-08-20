@@ -11,14 +11,14 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dbox.Database.Migrations
 {
     [DbContext(typeof(DboxDbContext))]
-    [Migration("20260820134036_InitialCreate")]
+    [Migration("20260820191637_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
 
             modelBuilder.Entity("Dbox.Activities.Activity", b =>
                 {
@@ -27,13 +27,47 @@ namespace Dbox.Database.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<string>("Area")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("area");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT")
                         .HasColumnName("created_at");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("TEXT")
                         .HasColumnName("description");
+
+                    b.Property<string>("Effort")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effort");
+
+                    b.Property<string>("Impact")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("impact");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("metadata");
+
+                    b.Property<string>("Reference")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("result");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source");
 
                     b.Property<string>("Status")
                         .IsRequired()

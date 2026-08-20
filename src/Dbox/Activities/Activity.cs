@@ -10,7 +10,21 @@ public sealed class Activity
 
     public string Title { get; set; } = string.Empty;
 
-    public string? Description { get; set; }
+    public string Description { get; set; } = string.Empty;
 
-    public string Status { get; set; } = ActivitySchema.DefaultStatus;
+    public string Status { get; set; } = string.Empty;
+
+    public string Source { get; set; } = string.Empty;
+
+    public string Area { get; set; } = string.Empty;
+
+    public string Result { get; set; } = string.Empty;
+
+    public string Impact { get; set; } = string.Empty;
+
+    public string Effort { get; set; } = string.Empty;
+
+    public string? Reference { get; set; }
+
+    public string? Metadata { get; set; }
 }

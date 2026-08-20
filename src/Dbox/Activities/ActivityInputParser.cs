@@ -66,7 +66,7 @@ public static class ActivityInputParser
     private static InputResult<ActivityCreateInput> ParseCreateJson(string? json)
     {
         var values = new JsonValues();
-        var issues = ReadJsonObject(json, values, allowDescriptionNull: true);
+        var issues = ReadJsonObject(json, values);
         if (issues.Count > 0)
         {
             return new InputResult<ActivityCreateInput>(default, issues);
@@ -77,16 +77,30 @@ public static class ActivityInputParser
             values.Title,
             values.Description,
             values.Status,
+            values.Source,
+            values.Area,
+            values.Result,
+            values.Impact,
+            values.Effort,
+            values.Reference,
+            values.Metadata,
             values.TypeProvided,
             values.TitleProvided,
             values.DescriptionProvided,
-            values.StatusProvided));
+            values.StatusProvided,
+            values.SourceProvided,
+            values.AreaProvided,
+            values.ResultProvided,
+            values.ImpactProvided,
+            values.EffortProvided,
+            values.ReferenceProvided,
+            values.MetadataProvided));
     }
 
     private static InputResult<ActivityUpdateInput> ParseUpdateJson(string? json)
     {
         var values = new JsonValues();
-        var issues = ReadJsonObject(json, values, allowDescriptionNull: true);
+        var issues = ReadJsonObject(json, values);
         if (issues.Count > 0)
         {
             return new InputResult<ActivityUpdateInput>(default, issues);
@@ -98,14 +112,28 @@ public static class ActivityInputParser
             Title = values.Title,
             Description = values.Description,
             Status = values.Status,
+            Source = values.Source,
+            Area = values.Area,
+            Result = values.Result,
+            Impact = values.Impact,
+            Effort = values.Effort,
+            Reference = values.Reference,
+            Metadata = values.Metadata,
             TypeProvided = values.TypeProvided,
             TitleProvided = values.TitleProvided,
             DescriptionProvided = values.DescriptionProvided,
-            StatusProvided = values.StatusProvided
+            StatusProvided = values.StatusProvided,
+            SourceProvided = values.SourceProvided,
+            AreaProvided = values.AreaProvided,
+            ResultProvided = values.ResultProvided,
+            ImpactProvided = values.ImpactProvided,
+            EffortProvided = values.EffortProvided,
+            ReferenceProvided = values.ReferenceProvided,
+            MetadataProvided = values.MetadataProvided
         });
     }
 
-    private static List<ValidationIssue> ReadJsonObject(string? json, JsonValues values, bool allowDescriptionNull)
+    private static List<ValidationIssue> ReadJsonObject(string? json, JsonValues values)
     {
         var issues = new List<ValidationIssue>();
         if (string.IsNullOrWhiteSpace(json))
@@ -137,11 +165,39 @@ public static class ActivityInputParser
                         break;
                     case "description":
                         values.DescriptionProvided = true;
-                        values.Description = ReadNullableString(property, issues, allowDescriptionNull);
+                        values.Description = ReadString(property, issues);
                         break;
                     case "status":
                         values.StatusProvided = true;
                         values.Status = ReadString(property, issues);
+                        break;
+                    case "source":
+                        values.SourceProvided = true;
+                        values.Source = ReadString(property, issues);
+                        break;
+                    case "area":
+                        values.AreaProvided = true;
+                        values.Area = ReadString(property, issues);
+                        break;
+                    case "result":
+                        values.ResultProvided = true;
+                        values.Result = ReadString(property, issues);
+                        break;
+                    case "impact":
+                        values.ImpactProvided = true;
+                        values.Impact = ReadString(property, issues);
+                        break;
+                    case "effort":
+                        values.EffortProvided = true;
+                        values.Effort = ReadString(property, issues);
+                        break;
+                    case "reference":
+                        values.ReferenceProvided = true;
+                        values.Reference = ReadNullableString(property, issues);
+                        break;
+                    case "metadata":
+                        values.MetadataProvided = true;
+                        values.Metadata = ReadMetadata(property, issues);
                         break;
                     case "id":
                     case "created_at":
@@ -172,17 +228,30 @@ public static class ActivityInputParser
         return property.Value.GetString();
     }
 
-    private static string? ReadNullableString(
-        JsonProperty property,
-        ICollection<ValidationIssue> issues,
-        bool allowNull)
+    private static string? ReadNullableString(JsonProperty property, ICollection<ValidationIssue> issues)
     {
-        if (property.Value.ValueKind == JsonValueKind.Null && allowNull)
+        if (property.Value.ValueKind == JsonValueKind.Null)
         {
             return null;
         }
 
         return ReadString(property, issues);
+    }
+
+    private static string? ReadMetadata(JsonProperty property, ICollection<ValidationIssue> issues)
+    {
+        if (property.Value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (property.Value.ValueKind != JsonValueKind.Object)
+        {
+            issues.Add(new ValidationIssue(property.Name, "Value must be a JSON object or null."));
+            return null;
+        }
+
+        return property.Value.GetRawText();
     }
 
     private sealed class JsonValues
@@ -191,9 +260,23 @@ public static class ActivityInputParser
         public string? Title { get; set; }
         public string? Description { get; set; }
         public string? Status { get; set; }
+        public string? Source { get; set; }
+        public string? Area { get; set; }
+        public string? Result { get; set; }
+        public string? Impact { get; set; }
+        public string? Effort { get; set; }
+        public string? Reference { get; set; }
+        public string? Metadata { get; set; }
         public bool TypeProvided { get; set; }
         public bool TitleProvided { get; set; }
         public bool DescriptionProvided { get; set; }
         public bool StatusProvided { get; set; }
+        public bool SourceProvided { get; set; }
+        public bool AreaProvided { get; set; }
+        public bool ResultProvided { get; set; }
+        public bool ImpactProvided { get; set; }
+        public bool EffortProvided { get; set; }
+        public bool ReferenceProvided { get; set; }
+        public bool MetadataProvided { get; set; }
     }
 }

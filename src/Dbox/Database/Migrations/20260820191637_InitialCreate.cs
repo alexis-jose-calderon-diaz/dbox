@@ -20,8 +20,15 @@ namespace Dbox.Database.Migrations
                     created_at = table.Column<DateTime>(type: "TEXT", nullable: false),
                     type = table.Column<string>(type: "TEXT", nullable: false),
                     title = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
-                    description = table.Column<string>(type: "TEXT", nullable: true),
-                    status = table.Column<string>(type: "TEXT", nullable: false)
+                    description = table.Column<string>(type: "TEXT", nullable: false),
+                    status = table.Column<string>(type: "TEXT", nullable: false),
+                    source = table.Column<string>(type: "TEXT", nullable: false),
+                    area = table.Column<string>(type: "TEXT", nullable: false),
+                    result = table.Column<string>(type: "TEXT", nullable: false),
+                    impact = table.Column<string>(type: "TEXT", nullable: false),
+                    effort = table.Column<string>(type: "TEXT", nullable: false),
+                    reference = table.Column<string>(type: "TEXT", nullable: true),
+                    metadata = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {

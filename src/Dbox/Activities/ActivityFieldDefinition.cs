@@ -8,6 +8,6 @@ public sealed record ActivityFieldDefinition(
     bool Mutable,
     IReadOnlyList<string>? EnumValues = null,
     int? MaxLength = null,
-    string? DefaultValue = null,
     bool NonBlank = false,
-    bool Nullable = false);
+    bool Nullable = false,
+    string? Description = null);
