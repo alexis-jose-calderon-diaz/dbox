@@ -1,6 +1,7 @@
 using Dbox.Database;
+using Dbox.Tests.Support;
 
-namespace Dbox.Tests;
+namespace Dbox.Tests.Database;
 
 public sealed class DboxLocatorTests
 {

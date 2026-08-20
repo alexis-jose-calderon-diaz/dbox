@@ -1,7 +1,7 @@
 using System.Text;
 using Dbox.Cli;
 
-namespace Dbox.Tests;
+namespace Dbox.Tests.Support;
 
 public sealed class TestProject : IDisposable
 {
@@ -36,5 +36,3 @@ public sealed class TestProject : IDisposable
         return new CliResult(exitCode, output.ToString(), error.ToString());
     }
 }
-
-public sealed record CliResult(int ExitCode, string Output, string Error);
