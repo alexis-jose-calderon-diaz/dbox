@@ -617,46 +617,89 @@ incluir encabezados, mensajes auxiliares ni texto de diagnostico.
 
 ## Arquitectura futura minima
 
-La implementacion puede adoptar esta estructura, sin agregar capas generales:
+La implementacion debe reflejar la jerarquia publica de comandos sin agregar
+capas generales, un contenedor de DI complejo ni repositorios genericos:
 
 ```text
 src/
 └── Dbox/
     ├── Program.cs
-    ├── ExitCodes.cs
+    ├── Cli/
+    │   ├── DboxCli.cs
+    │   ├── CliError.cs
+    │   ├── CommandExecutor.cs
+    │   └── ExitCodes.cs
     ├── Commands/
-    │   ├── InitCommand.cs
-    │   ├── SchemaCommand.cs
-    │   ├── AddCommand.cs
-    │   ├── ListCommand.cs
-    │   ├── GetCommand.cs
-    │   ├── UpdateCommand.cs
-    │   └── DeleteCommand.cs
+    │   ├── Root/
+    │   │   └── RootCommand.cs
+    │   ├── Init/
+    │   │   └── InitCommand.cs
+    │   └── Activity/
+    │       ├── ActivityCommand.cs
+    │       ├── Schema/
+    │       │   └── SchemaCommand.cs
+    │       ├── Add/
+    │       │   └── AddCommand.cs
+    │       ├── List/
+    │       │   └── ListCommand.cs
+    │       ├── Get/
+    │       │   └── GetCommand.cs
+    │       ├── Update/
+    │       │   └── UpdateCommand.cs
+    │       └── Delete/
+    │           └── DeleteCommand.cs
     ├── Activities/
     │   ├── Activity.cs
-    │   ├── ActivityCreate.cs
-    │   ├── ActivityUpdate.cs
+    │   ├── ActivityView.cs
     │   ├── ActivitySchema.cs
-    │   └── ActivityValidator.cs
+    │   ├── ActivityInputParser.cs
+    │   ├── ActivityValidation.cs
+    │   └── ActivityRepository.cs
     ├── Database/
     │   ├── DboxLocation.cs
     │   ├── DboxLocator.cs
     │   ├── DboxDbContext.cs
     │   ├── DboxDbContextFactory.cs
-    │   ├── ActivityRepository.cs
+    │   ├── DboxDatabase.cs
     │   └── Migrations/
     └── Output/
         ├── OutputFormat.cs
-        └── OutputWriter.cs
+        ├── OutputWriter.cs
+        ├── InitResponse.cs
+        └── DeleteResponse.cs
 
 tests/
 └── Dbox.Tests/
+    ├── Commands/
+    │   ├── Root/
+    │   ├── Init/
+    │   └── Activity/
+    │       ├── Schema/
+    │       ├── Add/
+    │       ├── List/
+    │       ├── Get/
+    │       ├── Update/
+    │       └── Delete/
+    ├── Integration/
+    ├── Database/
+    └── Support/
 ```
 
-`Program.cs` compone los componentes de forma explicita. No se requiere un
-contenedor de DI complejo. `DboxLocator` centraliza la ubicacion; el contexto
-recibe la ruta ya resuelta; el repositorio de actividades es especifico de
-`activity` y no generico.
+`Program.cs` y `DboxCli` componen los componentes de forma explicita. Cada
+carpeta bajo `Commands` corresponde a una parte de la jerarquia publica de la
+CLI y cada comando hoja define sus propias opciones, argumentos y accion.
+`CommandExecutor` contiene unicamente la ejecucion transversal de salida,
+errores y exit codes.
+
+`Activities` contiene el soporte compartido del catalogo `activity`; por eso
+`ActivityRepository` vive junto a la entidad, reglas y parser, y no bajo la
+infraestructura global. `DboxLocator` centraliza la ubicacion; el contexto
+recibe la ruta ya resuelta. `Dbox.Activities.Activity` conserva su namespace
+porque forma parte de la identidad CLR usada por el model snapshot de EF Core.
+
+Las pruebas mantienen un unico proyecto `Dbox.Tests`, con carpetas espejo para
+comandos y carpetas separadas para integracion, base de datos y utilidades. Los
+tests de cada caso siguen usando directorios temporales y bases independientes.
 
 ## Pruebas requeridas
 
