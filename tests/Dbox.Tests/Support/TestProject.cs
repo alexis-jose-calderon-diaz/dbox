@@ -35,4 +35,21 @@ public sealed class TestProject : IDisposable
         var exitCode = await DboxCli.InvokeAsync(args, output, error, workingDirectory);
         return new CliResult(exitCode, output.ToString(), error.ToString());
     }
+
+    public static async Task<CliResult> RunWithInputAsync(
+        string workingDirectory,
+        string input,
+        params string[] args)
+    {
+        using var output = new StringWriter(new StringBuilder());
+        using var error = new StringWriter(new StringBuilder());
+        using var inputReader = new StringReader(input);
+        var exitCode = await DboxCli.InvokeAsync(
+            args,
+            output,
+            error,
+            workingDirectory,
+            input: inputReader);
+        return new CliResult(exitCode, output.ToString(), error.ToString());
+    }
 }

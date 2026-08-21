@@ -38,7 +38,7 @@ public sealed class InitCommandTests
         var parentList = await TestProject.RunAsync(project.Root, "activity", "list");
 
         Assert.Equal(0, childInit.ExitCode);
-        Assert.Equal("[]\n", childList.Output);
+        Assert.Contains("\"items\": []", childList.Output);
         Assert.Contains("Parent", parentList.Output);
     }
 

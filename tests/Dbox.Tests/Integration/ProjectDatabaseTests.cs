@@ -43,7 +43,7 @@ public sealed class ProjectDatabaseTests
 
         Assert.Equal(0, init.ExitCode);
         Assert.Equal(0, list.ExitCode);
-        Assert.Equal("[]\n", list.Output);
+        Assert.Contains("\"items\": []", list.Output);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class ProjectDatabaseTests
         var list = await TestProject.RunAsync(project.Root, "activity", "list");
 
         Assert.Equal(0, list.ExitCode);
-        Assert.Equal("[]\n", list.Output);
+        Assert.Contains("\"items\": []", list.Output);
     }
 
     [Fact]

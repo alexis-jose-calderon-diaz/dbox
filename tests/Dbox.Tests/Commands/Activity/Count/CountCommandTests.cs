@@ -28,7 +28,7 @@ public sealed class CountCommandTests
         Assert.Equal(0, filteredCount.ExitCode);
         Assert.Equal(2, filteredCountDocument.RootElement.GetProperty("count").GetInt32());
         Assert.Equal(0, page.ExitCode);
-        Assert.Equal("Second", pageDocument.RootElement[0].GetProperty("title").GetString());
+        Assert.Equal("Second", pageDocument.RootElement.GetProperty("items")[0].GetProperty("title").GetString());
         Assert.Equal(2, invalidFilter.ExitCode);
         Assert.Equal(2, invalidPagination.ExitCode);
         Assert.Contains("validation_error", invalidFilter.Error);

@@ -65,11 +65,11 @@ public sealed class ActivityCrudTests
         Assert.Equal(0, secondAdd.ExitCode);
         Assert.Contains("\"status\": \"pending\"", secondAdd.Output);
         Assert.Equal(0, list.ExitCode);
-        Assert.Equal(2, listDocument.RootElement.GetArrayLength());
-        Assert.Equal(1, listDocument.RootElement[0].GetProperty("id").GetInt64());
-        Assert.Equal(2, listDocument.RootElement[1].GetProperty("id").GetInt64());
-        Assert.Equal(1, filteredDocument.RootElement.GetArrayLength());
-        Assert.Equal("Build", filteredDocument.RootElement[0].GetProperty("title").GetString());
+        Assert.Equal(2, listDocument.RootElement.GetProperty("items").GetArrayLength());
+        Assert.Equal(1, listDocument.RootElement.GetProperty("items")[0].GetProperty("id").GetInt64());
+        Assert.Equal(2, listDocument.RootElement.GetProperty("items")[1].GetProperty("id").GetInt64());
+        Assert.Equal(1, filteredDocument.RootElement.GetProperty("items").GetArrayLength());
+        Assert.Equal("Build", filteredDocument.RootElement.GetProperty("items")[0].GetProperty("title").GetString());
         Assert.Equal(0, update.ExitCode);
         Assert.Contains("\"description\": \"Updated details\"", update.Output);
         Assert.Equal(0, get.ExitCode);

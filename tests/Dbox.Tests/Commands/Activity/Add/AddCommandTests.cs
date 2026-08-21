@@ -21,7 +21,7 @@ public sealed class AddCommandTests
         Assert.Equal(2, invalid.ExitCode);
         Assert.Empty(invalid.Output);
         Assert.Contains("validation_error", invalid.Error);
-        Assert.Equal("[]\n", list.Output);
+        Assert.Contains("\"items\": []", list.Output);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class AddCommandTests
         Assert.Contains("must be one of", wrongCase.Error);
         Assert.Contains("must be one of", invalidEffort.Error);
         Assert.Contains("at most 200", tooLong.Error);
-        Assert.Equal("[]\n", list.Output);
+        Assert.Contains("\"items\": []", list.Output);
     }
 
     [Fact]
@@ -104,6 +104,6 @@ public sealed class AddCommandTests
         Assert.Contains("description", missing.Error);
         Assert.Contains("non-blank", blankDescription.Error);
         Assert.Contains("JSON object", invalidMetadata.Error);
-        Assert.Equal("[]\n", list.Output);
+        Assert.Contains("\"items\": []", list.Output);
     }
 }
