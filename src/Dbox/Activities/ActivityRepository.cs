@@ -1,3 +1,5 @@
+using System.Data;
+using Dbox.Cli;
 using Dbox.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,6 +39,15 @@ public sealed class ActivityRepository
     public Task<int> CountAsync(DboxDbContext context, ActivityFilter filter, CancellationToken cancellationToken) =>
         ApplyFilter(context, filter).CountAsync(cancellationToken);
 
+    public Task<List<Activity>> ListAllAsync(
+        DboxDbContext context,
+        CancellationToken cancellationToken) =>
+        context.Activities
+            .AsNoTracking()
+            .OrderBy(activity => activity.CreatedAt)
+            .ThenBy(activity => activity.Id)
+            .ToListAsync(cancellationToken);
+
     public Task<Activity?> GetAsync(DboxDbContext context, long id, CancellationToken cancellationToken)
     {
         return context.Activities.AsNoTracking().SingleOrDefaultAsync(activity => activity.Id == id, cancellationToken);
@@ -53,6 +64,9 @@ public sealed class ActivityRepository
         {
             return null;
         }
+
+        var expectedVersion = input.Version!.Value;
+        context.Entry(activity).Property(item => item.Version).OriginalValue = expectedVersion;
 
         if (input.TypeProvided)
         {
@@ -109,8 +123,82 @@ public sealed class ActivityRepository
             activity.Metadata = input.Metadata;
         }
 
-        await context.SaveChangesAsync(cancellationToken);
+        activity.UpdatedAt = ActivityTimestamp.UtcNow();
+        activity.Version = checked(expectedVersion + 1);
+
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw CliException.Conflict(id);
+        }
+
         return activity;
+    }
+
+    public async Task<int> ImportAsync(
+        DboxDbContext context,
+        IReadOnlyList<PortableActivityRecord> records,
+        CancellationToken cancellationToken)
+    {
+        if (records.Count == 0)
+        {
+            return 0;
+        }
+
+        var duplicate = records
+            .GroupBy(record => record.Id)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null)
+        {
+            throw CliException.Conflict($"Import contains duplicate activity id {duplicate.Key}.");
+        }
+
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
+        var ids = records.Select(record => record.Id).ToArray();
+        var existingIds = await context.Activities
+            .AsNoTracking()
+            .Where(activity => ids.Contains(activity.Id))
+            .Select(activity => activity.Id)
+            .ToListAsync(cancellationToken);
+        if (existingIds.Count > 0)
+        {
+            throw CliException.Conflict($"Import conflicts with activity id {existingIds[0]}.");
+        }
+
+        context.Activities.AddRange(records.Select(record => new Activity
+        {
+            Id = record.Id,
+            CreatedAt = record.CreatedAt,
+            UpdatedAt = record.UpdatedAt,
+            Version = record.Version,
+            Type = record.Type,
+            Title = record.Title,
+            Description = record.Description,
+            Status = record.Status,
+            Source = record.Source,
+            Area = record.Area,
+            Result = record.Result,
+            Impact = record.Impact,
+            Effort = record.Effort,
+            Reference = record.Reference,
+            Metadata = record.Metadata
+        }));
+
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return records.Count;
+        }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+        {
+            throw CliException.Conflict();
+        }
     }
 
     public async Task<bool> DeleteAsync(DboxDbContext context, long id, CancellationToken cancellationToken)
@@ -177,6 +265,13 @@ public sealed class ActivityRepository
         }
 
         return query;
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception)
+    {
+        var message = exception.ToString();
+        return message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("unique constraint", StringComparison.OrdinalIgnoreCase);
     }
 }
 

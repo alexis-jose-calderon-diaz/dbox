@@ -3,6 +3,7 @@ using System;
 using Dbox.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dbox.Database.Migrations
 {
     [DbContext(typeof(DboxDbContext))]
-    partial class DboxDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260821190440_AddActivityConcurrencyMetadata")]
+    partial class AddActivityConcurrencyMetadata
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");

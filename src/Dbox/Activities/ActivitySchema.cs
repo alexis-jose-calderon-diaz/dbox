@@ -5,6 +5,7 @@ public static class ActivitySchema
     public const string EntityName = "activity";
     public const string TableName = "activities";
     public const int TitleMaxLength = 200;
+    public const long InitialVersion = 1;
 
     public static IReadOnlyList<string> Statuses { get; } =
         ["pending", "in_progress", "completed"];
@@ -16,6 +17,8 @@ public static class ActivitySchema
     [
         new("id", "integer", Required: true, Generated: true, Mutable: false, Description: "Identificador entero generado automaticamente."),
         new("created_at", "datetime", Required: true, Generated: true, Mutable: false, Description: "Fecha y hora UTC generada al crear la actividad."),
+        new("updated_at", "datetime", Required: true, Generated: true, Mutable: false, Description: "Fecha y hora UTC de la ultima modificacion exitosa."),
+        new("version", "integer", Required: true, Generated: true, Mutable: false, Description: "Version positiva generada para controlar concurrencia.", DefaultValue: InitialVersion),
         new("type", "string", Required: true, Generated: false, Mutable: true, NonBlank: true, Description: "Clasificacion extensible de la actividad."),
         new("title", "string", Required: true, Generated: false, Mutable: true, MaxLength: TitleMaxLength, NonBlank: true, Description: "Titulo breve de la actividad."),
         new("description", "string", Required: true, Generated: false, Mutable: true, NonBlank: true, Description: "Descripcion de lo realizado."),
@@ -52,6 +55,7 @@ public static class ActivitySchema
                 Enum = field.EnumValues,
                 MaxLength = field.MaxLength,
                 Nullable = field.Nullable ? true : null,
+                Default = field.DefaultValue,
                 Description = field.Description ?? string.Empty
             };
         }

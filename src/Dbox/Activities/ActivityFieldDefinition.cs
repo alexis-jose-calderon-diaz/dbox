@@ -10,4 +10,5 @@ public sealed record ActivityFieldDefinition(
     int? MaxLength = null,
     bool NonBlank = false,
     bool Nullable = false,
-    string? Description = null);
+    string? Description = null,
+    object? DefaultValue = null);

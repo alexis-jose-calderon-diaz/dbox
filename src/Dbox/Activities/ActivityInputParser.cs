@@ -65,7 +65,7 @@ public static class ActivityInputParser
     public static InputResult<ActivityCreateInput> ParseCreate(string? json)
     {
         var values = new JsonValues();
-        var issues = ReadJsonObject(json, values, out var errorMessage);
+        var issues = ReadJsonObject(json, values, allowVersion: false, out var errorMessage);
         if (issues.Count > 0)
         {
             return new InputResult<ActivityCreateInput>(default, issues, errorMessage);
@@ -99,7 +99,7 @@ public static class ActivityInputParser
     public static InputResult<ActivityUpdateInput> ParseUpdate(string? json)
     {
         var values = new JsonValues();
-        var issues = ReadJsonObject(json, values, out var errorMessage);
+        var issues = ReadJsonObject(json, values, allowVersion: true, out var errorMessage);
         if (issues.Count > 0)
         {
             return new InputResult<ActivityUpdateInput>(default, issues, errorMessage);
@@ -107,6 +107,7 @@ public static class ActivityInputParser
 
         return InputResult<ActivityUpdateInput>.Success(new ActivityUpdateInput
         {
+            Version = values.Version,
             Type = values.Type,
             Title = values.Title,
             Description = values.Description,
@@ -128,7 +129,8 @@ public static class ActivityInputParser
             ImpactProvided = values.ImpactProvided,
             EffortProvided = values.EffortProvided,
             ReferenceProvided = values.ReferenceProvided,
-            MetadataProvided = values.MetadataProvided
+            MetadataProvided = values.MetadataProvided,
+            VersionProvided = values.VersionProvided
         });
     }
 
@@ -225,6 +227,7 @@ public static class ActivityInputParser
     private static List<ValidationIssue> ReadJsonObject(
         string? json,
         JsonValues values,
+        bool allowVersion,
         out string? errorMessage)
     {
         var issues = new List<ValidationIssue>();
@@ -296,7 +299,18 @@ public static class ActivityInputParser
                         break;
                     case "id":
                     case "created_at":
+                    case "updated_at":
                         issues.Add(new ValidationIssue(property.Name, "Field is generated and read-only."));
+                        break;
+                    case "version":
+                        if (!allowVersion)
+                        {
+                            issues.Add(new ValidationIssue(property.Name, "Field is generated and read-only."));
+                            break;
+                        }
+
+                        values.VersionProvided = true;
+                        values.Version = ReadInteger(property, issues);
                         break;
                     default:
                         issues.Add(new ValidationIssue(property.Name, "Unknown property."));
@@ -380,6 +394,18 @@ public static class ActivityInputParser
         return property.Value.GetRawText();
     }
 
+    private static long? ReadInteger(JsonProperty property, ICollection<ValidationIssue> issues)
+    {
+        if (property.Value.ValueKind != JsonValueKind.Number ||
+            !property.Value.TryGetInt64(out var value))
+        {
+            issues.Add(new ValidationIssue(property.Name, "Value must be an integer."));
+            return null;
+        }
+
+        return value;
+    }
+
     private static ActivityFilter EmptyFilter() => new(null, null, null, null, null, null, null, null, null);
 
     private static InputResult<T> InvalidJson<T>() => new(
@@ -405,6 +431,7 @@ public static class ActivityInputParser
         public string? Effort { get; set; }
         public string? Reference { get; set; }
         public string? Metadata { get; set; }
+        public long? Version { get; set; }
         public bool TypeProvided { get; set; }
         public bool TitleProvided { get; set; }
         public bool DescriptionProvided { get; set; }
@@ -416,5 +443,6 @@ public static class ActivityInputParser
         public bool EffortProvided { get; set; }
         public bool ReferenceProvided { get; set; }
         public bool MetadataProvided { get; set; }
+        public bool VersionProvided { get; set; }
     }
 }

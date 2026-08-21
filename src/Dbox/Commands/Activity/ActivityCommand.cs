@@ -3,7 +3,9 @@ using Dbox.Cli;
 using Dbox.Commands.Activity.Add;
 using Dbox.Commands.Activity.Count;
 using Dbox.Commands.Activity.Delete;
+using Dbox.Commands.Activity.Export;
 using Dbox.Commands.Activity.Get;
+using Dbox.Commands.Activity.Import;
 using Dbox.Commands.Activity.List;
 using Dbox.Commands.Activity.Schema;
 using Dbox.Commands.Activity.Update;
@@ -23,6 +25,8 @@ public static class ActivityCommand
         command.Add(GetCommand.Create(context));
         command.Add(UpdateCommand.Create(context));
         command.Add(DeleteCommand.Create(context));
+        command.Add(ExportCommand.Create(context));
+        command.Add(ImportCommand.Create(context));
         return command;
     }
 

@@ -2,6 +2,8 @@ namespace Dbox.Activities;
 
 public sealed class ActivityUpdateInput
 {
+    public long? Version { get; init; }
+
     public string? Type { get; init; }
 
     public string? Title { get; init; }
@@ -45,6 +47,8 @@ public sealed class ActivityUpdateInput
     public bool ReferenceProvided { get; init; }
 
     public bool MetadataProvided { get; init; }
+
+    public bool VersionProvided { get; init; }
 
     public bool HasChanges => TypeProvided || TitleProvided || DescriptionProvided || StatusProvided ||
         SourceProvided || AreaProvided || ResultProvided || ImpactProvided || EffortProvided ||

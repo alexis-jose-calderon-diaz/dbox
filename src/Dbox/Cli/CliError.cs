@@ -31,6 +31,15 @@ public sealed class CliException(CliError error) : Exception(error.Message)
     public static CliException ResourceNotFound(long id) =>
         new(new CliError("resource_not_found", $"Activity {id} not found.", ExitCodes.ResourceNotFound));
 
+    public static CliException Conflict(long id) =>
+        new(new CliError("conflict_error", $"Activity {id} has a version conflict.", ExitCodes.ConflictError));
+
+    public static CliException Conflict(string message = "Activity import conflicts with existing data.") =>
+        new(new CliError("conflict_error", message, ExitCodes.ConflictError));
+
+    public static CliException Io(Exception _) =>
+        new(new CliError("io_error", "Unable to read import file.", ExitCodes.IoError));
+
     public static CliException Unexpected() =>
         new(new CliError("unexpected_error", "Unexpected error.", ExitCodes.UnexpectedError));
 }

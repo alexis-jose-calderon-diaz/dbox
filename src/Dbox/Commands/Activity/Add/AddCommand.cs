@@ -54,6 +54,7 @@ public static class AddCommand
         var validation = ActivityValidator.ValidateCreate(input.Value!);
         ActivityCommand.ThrowIfInvalid(validation.Issues);
 
+        var now = ActivityTimestamp.UtcNow();
         var activity = new ActivityEntity
         {
             Type = input.Value!.Type!,
@@ -67,7 +68,9 @@ public static class AddCommand
             Effort = input.Value.Effort!,
             Reference = input.Value.Reference,
             Metadata = input.Value.Metadata,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now,
+            UpdatedAt = now,
+            Version = ActivitySchema.InitialVersion
         };
 
         return await context.Database.ExecuteAsync(

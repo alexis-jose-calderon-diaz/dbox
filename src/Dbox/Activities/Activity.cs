@@ -6,6 +6,10 @@ public sealed class Activity
 
     public DateTime CreatedAt { get; set; }
 
+    public DateTime UpdatedAt { get; set; }
+
+    public long Version { get; set; }
+
     public string Type { get; set; } = string.Empty;
 
     public string Title { get; set; } = string.Empty;

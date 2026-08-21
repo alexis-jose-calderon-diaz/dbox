@@ -39,8 +39,13 @@ public sealed class ActivitySchemaField
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Nullable { get; init; }
 
-    [JsonPropertyName("description")]
+    [JsonPropertyName("default")]
     [JsonPropertyOrder(8)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object? Default { get; init; }
+
+    [JsonPropertyName("description")]
+    [JsonPropertyOrder(9)]
     public string Description { get; init; } = string.Empty;
 
 }

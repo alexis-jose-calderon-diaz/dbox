@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -7,6 +6,8 @@ namespace Dbox.Activities;
 public sealed record ActivityView(
     [property: JsonPropertyName("id")] long Id,
     [property: JsonPropertyName("created_at")] string CreatedAt,
+    [property: JsonPropertyName("updated_at")] string UpdatedAt,
+    [property: JsonPropertyName("version")] long Version,
     [property: JsonPropertyName("type")] string Type,
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("description")] string Description,
@@ -22,9 +23,12 @@ public sealed record ActivityView(
     public static ActivityView FromEntity(Activity activity)
     {
         var createdAt = DateTime.SpecifyKind(activity.CreatedAt, DateTimeKind.Utc);
+        var updatedAt = DateTime.SpecifyKind(activity.UpdatedAt, DateTimeKind.Utc);
         return new ActivityView(
             activity.Id,
-            createdAt.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
+            ActivityTimestamp.Format(createdAt),
+            ActivityTimestamp.Format(updatedAt),
+            activity.Version,
             activity.Type,
             activity.Title,
             activity.Description,

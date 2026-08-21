@@ -12,9 +12,23 @@ public sealed class OutputWriter(TextWriter output, TextWriter error)
         DefaultIgnoreCondition = JsonIgnoreCondition.Never
     };
 
+    private static readonly JsonSerializerOptions CompactJsonOptions = new()
+    {
+        WriteIndented = false,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never
+    };
+
     public void WriteSuccess(object? value)
     {
         output.WriteLine(JsonSerializer.Serialize(value, JsonOptions));
+    }
+
+    public void WriteJsonLines<T>(IEnumerable<T> values)
+    {
+        foreach (var value in values)
+        {
+            output.WriteLine(JsonSerializer.Serialize(value, CompactJsonOptions));
+        }
     }
 
     public void WriteError(CliError cliError)

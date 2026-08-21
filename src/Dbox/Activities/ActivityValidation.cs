@@ -19,9 +19,48 @@ public static class ActivityValidator
         return new ValidationResult(issues);
     }
 
+    public static ValidationResult ValidateImport(IReadOnlyList<PortableActivityRecord> records)
+    {
+        var issues = new List<ValidationIssue>();
+        foreach (var record in records)
+        {
+            var validation = ValidateCreate(new ActivityCreateInput(
+                record.Type,
+                record.Title,
+                record.Description,
+                record.Status,
+                record.Source,
+                record.Area,
+                record.Result,
+                record.Impact,
+                record.Effort,
+                record.Reference,
+                record.Metadata,
+                TypeProvided: true,
+                TitleProvided: true,
+                DescriptionProvided: true,
+                StatusProvided: true,
+                SourceProvided: true,
+                AreaProvided: true,
+                ResultProvided: true,
+                ImpactProvided: true,
+                EffortProvided: true,
+                ReferenceProvided: true,
+                MetadataProvided: true));
+            issues.AddRange(validation.Issues);
+        }
+
+        return new ValidationResult(issues);
+    }
+
     public static ValidationResult ValidateUpdate(ActivityUpdateInput input)
     {
         var issues = new List<ValidationIssue>();
+
+        if (!input.VersionProvided || input.Version is null || input.Version <= 0)
+        {
+            issues.Add(new ValidationIssue("version", "Value must be a positive integer version."));
+        }
 
         if (!input.HasChanges)
         {

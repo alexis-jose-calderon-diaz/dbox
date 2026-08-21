@@ -14,6 +14,8 @@ public sealed class DboxDbContext(DbContextOptions<DboxDbContext> options) : DbC
         activity.HasKey(item => item.Id);
         var id = ActivitySchema.Field("id");
         var createdAt = ActivitySchema.Field("created_at");
+        var updatedAt = ActivitySchema.Field("updated_at");
+        var version = ActivitySchema.Field("version");
         var type = ActivitySchema.Field("type");
         var title = ActivitySchema.Field("title");
         var description = ActivitySchema.Field("description");
@@ -34,6 +36,20 @@ public sealed class DboxDbContext(DbContextOptions<DboxDbContext> options) : DbC
             .HasColumnName(createdAt.Name)
             .HasColumnType("TEXT")
             .IsRequired(createdAt.Required);
+
+        activity.Property(item => item.UpdatedAt)
+            .HasColumnName(updatedAt.Name)
+            .HasColumnType("TEXT")
+            .HasDefaultValueSql("CURRENT_TIMESTAMP")
+            .ValueGeneratedOnAdd()
+            .IsRequired(updatedAt.Required);
+
+        activity.Property(item => item.Version)
+            .HasColumnName(version.Name)
+            .HasDefaultValue(ActivitySchema.InitialVersion)
+            .ValueGeneratedOnAdd()
+            .IsConcurrencyToken()
+            .IsRequired(version.Required);
 
         activity.Property(item => item.Type)
             .HasColumnName(type.Name)
