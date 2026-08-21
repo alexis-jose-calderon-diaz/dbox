@@ -16,12 +16,16 @@ comando + --json '{...}' -> comando -> JSON por stdout
 
 - Toda respuesta exitosa se escribe en `stdout` como un unico valor JSON.
 - Todo error esperado se escribe en `stderr` como un unico objeto JSON.
-- `--json '<objeto>'` es la unica opcion para enviar un payload JSON.
-- `--json` es obligatorio en `add` y `update`.
-- `--json` es opcional en `list` y `count`; si se omite, no hay filtros.
+- `--json '<objeto>'` y `--json-file <path>` son fuentes JSON alternativas y
+  mutuamente excluyentes.
+- `--json-file -` lee la fuente JSON desde `stdin`; los archivos se leen como
+  UTF-8.
+- Una fuente JSON es obligatoria en `add` y `update` y opcional en `list` y
+  `count`; si se omite en estos ultimos, no hay filtros.
 - No existen `--output text` ni `--output json`.
 - No existen aliases de comandos.
-- `add`, `list`, `count` y `update` reciben su payload mediante `--json`.
+- `add`, `list`, `count` y `update` reciben su payload mediante `--json` o
+  `--json-file`.
 - `get`, `update` y `delete` reciben el identificador como argumento
   posicional: `get 1`, `update 1` y `delete 1`.
 - `init`, `context`, `backup`, `doctor` y `activity schema` no reciben payload.
@@ -29,7 +33,8 @@ comando + --json '{...}' -> comando -> JSON por stdout
   explicita.
 - `activity delete <id> --dry-run` previsualiza sin migrar ni persistir; si se
   combinan `--dry-run` y `--yes`, prevalece `--dry-run`.
-- La CLI no lee payloads desde `stdin`.
+- La CLI no lee payloads desde `stdin` de forma implicita; solo lo hace cuando
+  se especifica `--json-file -`.
 - No se aceptan arreglos JSON ni propiedades desconocidas en los payloads.
 - `--help` conserva la ayuda textual natural de una herramienta CLI.
 - `list` ordena siempre por `created_at ASC` y usa `id ASC` como desempate.
@@ -44,11 +49,11 @@ comando + --json '{...}' -> comando -> JSON por stdout
 | `dbox backup` | Ninguna | Referencia al backup creado |
 | `dbox doctor` | Ninguna | Diagnostico read-only de la base |
 | `dbox activity schema` | Ninguna | Documento de schema |
-| `dbox activity add --json '{...}'` | Objeto de actividad | Actividad creada |
-| `dbox activity list [--json '{...}']` | Filtros opcionales | Arreglo de actividades |
-| `dbox activity count [--json '{...}']` | Filtros opcionales | Objeto con `count` |
+| `dbox activity add --json '{...}'` o `--json-file <path>` | Objeto de actividad | Actividad creada |
+| `dbox activity list [--json '{...}' o --json-file <path>]` | Filtros opcionales | Envelope con actividades y paginacion |
+| `dbox activity count [--json '{...}' o --json-file <path>]` | Filtros opcionales | Objeto con `count` |
 | `dbox activity get 15` | ID posicional | Actividad solicitada |
-| `dbox activity update 15 --json '{...}'` | Campos modificables | Actividad actualizada |
+| `dbox activity update 15 --json '{...}'` o `--json-file <path>` | Campos modificables | Actividad actualizada |
 | `dbox activity delete 15 --yes` | ID y confirmacion | Confirmacion de borrado |
 | `dbox activity delete 15 --dry-run` | ID y previsualizacion | Actividad a eliminar |
 
@@ -182,16 +187,19 @@ Description:
   Create an activity.
 
 Usage:
-  dbox activity add --json <json> [options]
+  dbox activity add [options]
 
 Options:
-  --json <json>         Activity input as a JSON object.
-  --help                Show command line help.
+  --json <json>            Activity input as a JSON object.
+  --json-file <json-file>  Read activity input from a UTF-8 JSON file, or '-' for standard input.
+  --help                   Show command line help.
 ```
 
-`list --help` tambien muestra `--skip` y `--take`. `get`, `update` y `delete`
-muestran que el ID es un argumento posicional. `delete --help` tambien muestra
-`--yes` y `--dry-run`. Los detalles de campos y enums se descubren con `dbox activity schema`.
+`count --help` y `update --help` tambien muestran `--json-file` como alternativa
+a `--json`. `list --help` muestra `--json-file`, `--skip`, `--take` y `--all`.
+`get`, `update` y `delete` muestran que el ID es un argumento posicional.
+`delete --help` tambien muestra `--yes` y `--dry-run`. Los detalles de campos y
+enums se descubren con `dbox activity schema`.
 
 Ejemplo de ayuda de `list`:
 
@@ -207,10 +215,12 @@ Usage:
   dbox activity list [options]
 
 Options:
-  --json <json>         Optional filters as a JSON object.
-  --skip <skip>         Number of ordered records to skip. (Default: 0)
-  --take <take>         Maximum number of records to return.
-  --help                Show command line help.
+  --json <json>            Filters as a JSON object: type, status, area, source, effort, created_from, created_to, title, description.
+  --json-file <json-file>  Read filters from a UTF-8 JSON file, or '-' for standard input.
+  --skip <skip>            Number of ordered records to skip. Defaults to 0.
+  --take <take>            Maximum number of records to return. Defaults to 100.
+  --all                    Return all matching records without a limit.
+  --help                   Show command line help.
 ```
 
 Ejemplo de ayuda de `delete`:
@@ -409,43 +419,122 @@ Respuesta:
     "activity": {
       "fields": {
         "id": {
+          "name": "id",
           "type": "integer",
+          "required": false,
           "generated": true,
-          "mutable": false
+          "mutable": false,
+          "description": "Identificador entero generado automaticamente."
         },
         "created_at": {
+          "name": "created_at",
           "type": "datetime",
+          "required": false,
           "generated": true,
-          "mutable": false
+          "mutable": false,
+          "description": "Fecha y hora UTC generada al crear la actividad."
         },
         "type": {
+          "name": "type",
           "type": "string",
           "required": true,
-          "enum": [
-            "research",
-            "implementation",
-            "bugfix",
-            "maintenance"
-          ]
+          "generated": false,
+          "mutable": true,
+          "description": "Clasificacion extensible de la actividad."
         },
         "title": {
+          "name": "title",
           "type": "string",
           "required": true,
-          "maxLength": 200
+          "generated": false,
+          "mutable": true,
+          "maxLength": 200,
+          "description": "Titulo breve de la actividad."
         },
         "description": {
-          "type": "string",
-          "required": false
-        },
-        "status": {
+          "name": "description",
           "type": "string",
           "required": true,
-          "default": "completed",
+          "generated": false,
+          "mutable": true,
+          "description": "Descripcion de lo realizado."
+        },
+        "status": {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "generated": false,
+          "mutable": true,
           "enum": [
             "pending",
             "in_progress",
             "completed"
-          ]
+          ],
+          "description": "Estado actual de la actividad."
+        },
+        "source": {
+          "name": "source",
+          "type": "string",
+          "required": true,
+          "generated": false,
+          "mutable": true,
+          "description": "Origen o motivacion de la actividad."
+        },
+        "area": {
+          "name": "area",
+          "type": "string",
+          "required": true,
+          "generated": false,
+          "mutable": true,
+          "description": "Area funcional o tecnica afectada."
+        },
+        "result": {
+          "name": "result",
+          "type": "string",
+          "required": true,
+          "generated": false,
+          "mutable": true,
+          "description": "Resultado concreto obtenido."
+        },
+        "impact": {
+          "name": "impact",
+          "type": "string",
+          "required": true,
+          "generated": false,
+          "mutable": true,
+          "description": "Mejora, beneficio o consecuencia producida."
+        },
+        "effort": {
+          "name": "effort",
+          "type": "string",
+          "required": true,
+          "generated": false,
+          "mutable": true,
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "very-high"
+          ],
+          "description": "Estimacion cualitativa del esfuerzo."
+        },
+        "reference": {
+          "name": "reference",
+          "type": "string",
+          "required": false,
+          "generated": false,
+          "mutable": true,
+          "nullable": true,
+          "description": "Referencia textual opcional relacionada."
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "json",
+          "required": false,
+          "generated": false,
+          "mutable": true,
+          "nullable": true,
+          "description": "Objeto JSON opcional con informacion adicional extensible."
         }
       }
     }
@@ -455,13 +544,14 @@ Respuesta:
 
 ## Crear actividades
 
-### `dbox activity add --json '<objeto>'`
+### `dbox activity add --json '<objeto>'` o `--json-file <path>`
 
-La entrada llega completa en la opcion `--json`.
+La entrada llega completa en exactamente una fuente JSON. `--json-file -`
+permite recibir el objeto desde `stdin`.
 
 ```bash
 dbox activity add \
-  --json '{"type":"implementation","title":"Implementar refresh token"}'
+  --json '{"type":"implementation","title":"Implementar refresh token","description":"Agrega soporte de refresh token","status":"completed","source":"manual","area":"backend","result":"El flujo queda disponible","impact":"Mejora la continuidad de sesion","effort":"medium"}'
 ```
 
 Respuesta:
@@ -472,46 +562,44 @@ Respuesta:
   "created_at": "2026-08-20T11:30:00Z",
   "type": "implementation",
   "title": "Implementar refresh token",
-  "description": null,
-  "status": "completed"
+  "description": "Agrega soporte de refresh token",
+  "status": "completed",
+  "source": "manual",
+  "area": "backend",
+  "result": "El flujo queda disponible",
+  "impact": "Mejora la continuidad de sesion",
+  "effort": "medium",
+  "reference": null,
+  "metadata": null
 }
 ```
 
-Con todos los campos modificables:
+La misma entrada puede leerse desde un archivo UTF-8 o desde `stdin`:
 
 ```bash
-dbox activity add \
-  --json '{"type":"research","title":"Evaluar cache","description":"Comparar opciones","status":"pending"}'
-```
-
-Respuesta:
-
-```json
-{
-  "id": 16,
-  "created_at": "2026-08-20T11:31:00Z",
-  "type": "research",
-  "title": "Evaluar cache",
-  "description": "Comparar opciones",
-  "status": "pending"
-}
+dbox activity add --json-file activity.json
+cat activity.json | dbox activity add --json-file -
 ```
 
 Reglas de entrada:
 
-- `type` es obligatorio.
-- `title` es obligatorio, no puede estar vacio y admite hasta 200 caracteres.
-- `description` es opcional y puede ser `null`.
-- `status` es opcional; su valor predeterminado es `completed`.
+- `type`, `title`, `description`, `status`, `source`, `area`, `result`, `impact`
+  y `effort` son obligatorios.
+- `title` no puede estar vacio y admite hasta 200 caracteres.
+- `status` debe ser `pending`, `in_progress` o `completed`.
+- `effort` debe ser `low`, `medium`, `high` o `very-high`.
+- `reference` y `metadata` son opcionales; `metadata` debe ser un objeto JSON o
+  `null`.
 - `id` y `created_at` no se aceptan porque son generados.
 - Las propiedades desconocidas se rechazan.
+- `--json` y `--json-file` no pueden usarse juntos.
 
 ## Listar y filtrar actividades
 
 ### `dbox activity list`
 
-Sin `--json`, lista todas las actividades sin filtros. Esta forma es equivalente
-a enviar `--json '{}'`.
+Sin `--json` ni `--json-file`, lista todas las actividades sin filtros. Esta
+forma es equivalente a enviar `--json '{}'`.
 
 ```bash
 dbox activity list
@@ -520,30 +608,37 @@ dbox activity list
 Respuesta:
 
 ```json
-[
-  {
-    "id": 15,
-    "created_at": "2026-08-20T11:30:00Z",
-    "type": "implementation",
-    "title": "Implementar refresh token",
-    "description": null,
-    "status": "completed"
-  },
-  {
-    "id": 16,
-    "created_at": "2026-08-20T11:31:00Z",
-    "type": "research",
-    "title": "Evaluar cache",
-    "description": "Comparar opciones",
-    "status": "pending"
+{
+  "items": [
+    {
+      "id": 15,
+      "created_at": "2026-08-20T11:30:00Z",
+      "type": "implementation",
+      "title": "Implementar refresh token",
+      "description": "Agrega soporte de refresh token",
+      "status": "completed",
+      "source": "manual",
+      "area": "backend",
+      "result": "El flujo queda disponible",
+      "impact": "Mejora la continuidad de sesion",
+      "effort": "medium",
+      "reference": null,
+      "metadata": null
+    }
+  ],
+  "pagination": {
+    "skip": 0,
+    "take": 100,
+    "total": 1,
+    "has_more": false
   }
-]
+}
 ```
 
 Las actividades se ordenan siempre por `created_at ASC`. Cuando dos registros
 tienen la misma fecha de creacion, se usa `id ASC` como desempate.
 
-### `dbox activity list --json '<objeto>'` filtrado por tipo
+### `dbox activity list --json '<objeto>'` o `--json-file <path>` filtrado por tipo
 
 ```bash
 dbox activity list --json '{"type":"research"}'
@@ -552,16 +647,31 @@ dbox activity list --json '{"type":"research"}'
 Respuesta:
 
 ```json
-[
-  {
-    "id": 16,
-    "created_at": "2026-08-20T11:31:00Z",
-    "type": "research",
-    "title": "Evaluar cache",
-    "description": "Comparar opciones",
-    "status": "pending"
+{
+  "items": [
+    {
+      "id": 16,
+      "created_at": "2026-08-20T11:31:00Z",
+      "type": "research",
+      "title": "Evaluar cache",
+      "description": "Comparar opciones",
+      "status": "pending",
+      "source": "research",
+      "area": "infrastructure",
+      "result": "La alternativa queda evaluada",
+      "impact": "Reduce incertidumbre",
+      "effort": "low",
+      "reference": null,
+      "metadata": null
+    }
+  ],
+  "pagination": {
+    "skip": 0,
+    "take": 100,
+    "total": 1,
+    "has_more": false
   }
-]
+}
 ```
 
 ### `dbox activity list --json '<objeto>'` filtrado por estado
@@ -573,35 +683,59 @@ dbox activity list --json '{"status":"completed"}'
 Respuesta:
 
 ```json
-[
-  {
-    "id": 15,
-    "created_at": "2026-08-20T11:30:00Z",
-    "type": "implementation",
-    "title": "Implementar refresh token",
-    "description": null,
-    "status": "completed"
+{
+  "items": [
+    {
+      "id": 15,
+      "created_at": "2026-08-20T11:30:00Z",
+      "type": "implementation",
+      "title": "Implementar refresh token",
+      "description": "Agrega soporte de refresh token",
+      "status": "completed",
+      "source": "manual",
+      "area": "backend",
+      "result": "El flujo queda disponible",
+      "impact": "Mejora la continuidad de sesion",
+      "effort": "medium",
+      "reference": null,
+      "metadata": null
+    }
+  ],
+  "pagination": {
+    "skip": 0,
+    "take": 100,
+    "total": 1,
+    "has_more": false
   }
-]
+}
 ```
 
 ### `dbox activity list --json '<objeto>'` con filtros combinados
 
 ```bash
 dbox activity list \
-  --json '{"type":"research","status":"pending"}'
+  --json '{"type":"research","status":"pending","area":"backend","source":"openspec","effort":"low","created_from":"2026-01-01T00:00:00Z","created_to":"2026-12-31T23:59:59Z","title":"refresh","description":"token"}'
 ```
 
 Respuesta cuando no hay coincidencias:
 
 ```json
-[]
+{
+  "items": [],
+  "pagination": {
+    "skip": 0,
+    "take": 100,
+    "total": 0,
+    "has_more": false
+  }
+}
 ```
 
 ### Paginacion con `--skip` y `--take`
 
 `--skip` indica cuantos registros ordenados se omiten. `--take` indica el
-maximo de registros que se devuelven.
+maximo de registros que se devuelven. La respuesta siempre incluye los
+metadatos de paginacion.
 
 ```bash
 dbox activity list \
@@ -612,19 +746,27 @@ dbox activity list \
 Reglas de paginacion:
 
 - `--skip` es opcional y su valor predeterminado es `0`.
-- `--take` es opcional; si se omite, devuelve todos los registros restantes.
+- `--take` es opcional y su valor predeterminado es `100`.
+- `--all` elimina el limite; en ese caso `pagination.take` es `null`.
+- `--all` y `--take` no pueden usarse juntos.
 - Ambos valores deben ser enteros mayores o iguales que `0`.
 - El orden se aplica antes de `skip` y `take`.
+- `pagination.total` cuenta todas las coincidencias antes de paginar.
+- `pagination.has_more` indica si quedan coincidencias despues de la pagina.
 
-Los filtros aceptados en `--json` son `type` y `status`. Los valores deben
-coincidir exactamente con los enums del schema.
+Los filtros aceptados en `--json` y `--json-file` son `type`, `status`, `area`,
+`source`, `effort`, `created_from`, `created_to`, `title` y `description`.
+Los cinco primeros comparan el valor exacto. `created_from` y `created_to` son
+fechas UTC ISO 8601 con sufijo `Z` y sus limites son inclusivos; el primero no
+puede ser posterior al segundo. `title` y `description` realizan una busqueda
+parcial insensible a mayusculas. Todos los filtros se combinan con `AND`.
 
 ## Contar actividades
 
 ### `dbox activity count`
 
-Sin `--json`, devuelve la cantidad total de actividades. Esta forma es
-equivalente a `dbox activity count --json '{}'`.
+Sin `--json` ni `--json-file`, devuelve la cantidad total de actividades. Esta
+forma es equivalente a `dbox activity count --json '{}'`.
 
 ```bash
 dbox activity count
@@ -638,11 +780,18 @@ Respuesta:
 }
 ```
 
-`count` acepta los mismos filtros opcionales que `list`, por lo que tambien
-puede devolver la cantidad de registros de una busqueda concreta:
+`count` acepta los mismos filtros opcionales que `list` mediante `--json` o
+`--json-file`, sin paginacion, por lo que tambien puede devolver la cantidad de
+registros de una busqueda concreta:
 
 ```bash
 dbox activity count --json '{"type":"research","status":"pending"}'
+```
+
+Tambien puede recibir el filtro desde `stdin`:
+
+```bash
+cat filter.json | dbox activity count --json-file -
 ```
 
 Respuesta:
@@ -685,17 +834,25 @@ Respuesta:
   "created_at": "2026-08-20T11:30:00Z",
   "type": "implementation",
   "title": "Implementar refresh token",
-  "description": null,
-  "status": "completed"
+  "description": "Agrega soporte de refresh token",
+  "status": "completed",
+  "source": "manual",
+  "area": "backend",
+  "result": "El flujo queda disponible",
+  "impact": "Mejora la continuidad de sesion",
+  "effort": "medium",
+  "reference": null,
+  "metadata": null
 }
 ```
 
 ## Actualizar una actividad
 
-### `dbox activity update <id> --json '<objeto>'`
+### `dbox activity update <id> --json '<objeto>'` o `--json-file <path>`
 
-El identificador es un argumento posicional. El objeto de `--json` contiene
-solamente los campos que se desean modificar.
+El identificador es un argumento posicional. El objeto de la fuente JSON
+contiene solamente los campos que se desean modificar. Se debe proporcionar
+exactamente una fuente; `--json-file -` lee desde `stdin`.
 
 ```bash
 dbox activity update 15 --json '{"status":"in_progress"}'
@@ -709,8 +866,15 @@ Respuesta:
   "created_at": "2026-08-20T11:30:00Z",
   "type": "implementation",
   "title": "Implementar refresh token",
-  "description": null,
-  "status": "in_progress"
+  "description": "Agrega soporte de refresh token",
+  "status": "in_progress",
+  "source": "manual",
+  "area": "backend",
+  "result": "El flujo queda disponible",
+  "impact": "Mejora la continuidad de sesion",
+  "effort": "medium",
+  "reference": null,
+  "metadata": null
 }
 ```
 
@@ -721,10 +885,11 @@ dbox activity update 15 \
   --json '{"title":"Implementar refresh token con cookie","description":"Cookie HttpOnly"}'
 ```
 
-Limpiar la descripcion:
+Actualizar desde un archivo o limpiar un campo opcional:
 
 ```bash
-dbox activity update 15 --json '{"description":null}'
+dbox activity update 15 --json-file update.json
+dbox activity update 15 --json '{"reference":null,"metadata":null}'
 ```
 
 Respuesta:
@@ -735,15 +900,26 @@ Respuesta:
   "created_at": "2026-08-20T11:30:00Z",
   "type": "implementation",
   "title": "Implementar refresh token",
-  "description": null,
-  "status": "in_progress"
+  "description": "Cookie HttpOnly",
+  "status": "in_progress",
+  "source": "manual",
+  "area": "backend",
+  "result": "El flujo queda disponible",
+  "impact": "Mejora la continuidad de sesion",
+  "effort": "medium",
+  "reference": null,
+  "metadata": null
 }
 ```
 
 Reglas de entrada:
 
-- Se puede modificar `type`, `title`, `description` y `status`.
+- Se puede modificar `type`, `title`, `description`, `status`, `source`, `area`,
+  `result`, `impact`, `effort`, `reference` y `metadata`.
 - Debe existir al menos un campo modificable en el objeto JSON.
+- Los campos obligatorios no aceptan `null`, texto vacio ni texto formado solo
+  por espacios.
+- `reference` y `metadata` pueden recibir `null` para limpiarse.
 - `id` y `created_at` no se aceptan en el objeto JSON.
 - Las propiedades desconocidas se rechazan.
 - Los campos omitidos conservan su valor anterior.
@@ -817,6 +993,56 @@ la base.
 Los errores se escriben exclusivamente en `stderr`. En todos los casos,
 `stdout` queda vacio.
 
+### Fuentes JSON incompatibles
+
+Cuando se proporcionan `--json` y `--json-file` al mismo tiempo, la CLI no lee
+ninguna fuente ni ejecuta la operacion.
+
+```bash
+dbox activity count --json '{}' --json-file filters.json
+```
+
+Respuesta en `stderr`:
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Specify either '--json' or '--json-file', not both.",
+    "details": [
+      {
+        "field": "json",
+        "message": "Specify either '--json' or '--json-file', not both."
+      }
+    ]
+  }
+}
+```
+
+Exit code: `2`.
+
+### Archivo JSON ilegible
+
+Un archivo inexistente, inaccesible o que no pueda leerse como UTF-8 devuelve
+un error de validacion determinista.
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Unable to read JSON input.",
+    "details": [
+      {
+        "field": "json",
+        "message": "Unable to read JSON input."
+      }
+    ]
+  }
+}
+```
+
+Exit code: `2`.
+
 ### Entrada JSON invalida
 
 ```bash
@@ -829,11 +1055,11 @@ Respuesta en `stderr`:
 {
   "error": {
     "code": "validation_error",
-    "message": "Invalid request.",
+    "message": "JSON input must be a valid JSON object.",
     "details": [
       {
-        "field": "input",
-        "message": "The JSON input is invalid."
+        "field": "json",
+        "message": "JSON input must be a valid JSON object."
       }
     ]
   }
@@ -841,6 +1067,35 @@ Respuesta en `stderr`:
 ```
 
 Exit code: `2`.
+
+### Opciones de consulta invalidas
+
+`--all` no puede combinarse con un `--take` explicito:
+
+```bash
+dbox activity list --all --take 100
+```
+
+La respuesta es:
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Options '--all' and '--take' cannot be used together.",
+    "details": [
+      {
+        "field": "take",
+        "message": "Options '--all' and '--take' cannot be used together."
+      }
+    ]
+  }
+}
+```
+
+Los valores negativos de `--skip` o `--take`, las propiedades de filtro
+desconocidas, los enums invalidos, las fechas que no terminen en `Z` y los
+rangos UTC invertidos tambien devuelven `validation_error` con exit code `2`.
 
 ### Campo requerido ausente
 
@@ -858,11 +1113,11 @@ Respuesta en `stderr`:
 {
   "error": {
     "code": "validation_error",
-    "message": "Invalid request.",
+    "message": "Invalid activity.",
     "details": [
       {
         "field": "type",
-        "message": "Field is required."
+        "message": "Field must be a non-blank value."
       }
     ]
   }
@@ -877,8 +1132,15 @@ Entrada:
 
 ```json
 {
-  "type": "Research",
-  "title": "Mayusculas no permitidas"
+  "type": "research",
+  "title": "Mayusculas no permitidas",
+  "description": "Ejemplo",
+  "status": "completed",
+  "source": "manual",
+  "area": "backend",
+  "result": "Resultado",
+  "impact": "Impacto",
+  "effort": "Medium"
 }
 ```
 
@@ -888,11 +1150,11 @@ Respuesta en `stderr`:
 {
   "error": {
     "code": "validation_error",
-    "message": "Invalid request.",
+    "message": "Invalid activity.",
     "details": [
       {
-        "field": "type",
-        "message": "Value must be one of: research, implementation, bugfix, maintenance."
+        "field": "effort",
+        "message": "Value must be one of: low, medium, high, very-high."
       }
     ]
   }
@@ -1047,9 +1309,9 @@ Las siguientes formas ya no serian validas:
 | `dbox activity schema --json` | `dbox activity schema` |
 | `dbox activity list --output json` | `dbox activity list --json '{}'` |
 | `dbox activity list --type research` | `dbox activity list --json '{"type":"research"}'` |
-| `printf '%s' '{...}' \| dbox activity add` | `dbox activity add --json '{...}'` |
+| `printf '%s' '{...}' \| dbox activity add` | `printf '%s' '{...}' \| dbox activity add --json-file -` |
 | `dbox activity add --type research --title Test` | `dbox activity add --json '{"type":"research","title":"Test"}'` |
-| `printf '%s' '{"status":"completed"}' \| dbox activity update 15` | `dbox activity update 15 --json '{"status":"completed"}'` |
+| `printf '%s' '{"status":"completed"}' \| dbox activity update 15` | `printf '%s' '{"status":"completed"}' \| dbox activity update 15 --json-file -` |
 | `dbox activity update 15 --status completed` | `dbox activity update 15 --json '{"status":"completed"}'` |
 | `dbox --schema` | `dbox activity schema` |
 | `dbox activity delete 15` | `dbox activity delete 15 --yes` o `dbox activity delete 15 --dry-run` |
@@ -1067,17 +1329,15 @@ ninguna operacion sobre la base.
 | `3` | Recurso no encontrado |
 | `4` | Base no encontrada o error de base de datos |
 
-## Decisiones pendientes de revision
+## Decisiones incorporadas
 
-- Confirmar si todos los objetos deben rechazar propiedades desconocidas,
-  incluido el objeto de filtros de `list`.
-- Confirmar si el mensaje de error debe ser siempre `Invalid request.` o si
-  debe conservar mensajes mas especificos por comando.
-- Confirmar si `count` debe aceptar los mismos filtros que `list` o contar
-  siempre todos los registros sin importar el payload.
-- Definir si el calculo de `count` y la pagina posterior de `list` necesitan
-  una garantia de consistencia cuando se crean o eliminan registros entre
-  ambas invocaciones.
-- Confirmar si los comandos textuales (`activity add`, `activity list`, etc.)
-  son aceptables o si se quiere una unica entrada JSON con un campo
-  `command`.
+- Los objetos JSON de actividad y los filtros rechazan propiedades desconocidas
+  y valores que no tengan la forma documentada.
+- Los errores de fuentes JSON, filtros y paginacion conservan mensajes
+  deterministas dentro del envelope `validation_error`.
+- `count` acepta exactamente los mismos filtros que `list` y no pagina sus
+  resultados.
+- `list` calcula `total` sobre la consulta filtrada antes de aplicar
+  `skip`/`take`; la respuesta incluye `items` y `pagination`.
+- La CLI conserva los comandos textuales (`activity add`, `activity list`, etc.)
+  como selectores publicos.
