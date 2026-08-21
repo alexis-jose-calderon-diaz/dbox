@@ -12,7 +12,8 @@ public sealed class CommandContext
         DboxDatabase database,
         DboxDatabaseMaintenance databaseMaintenance,
         ActivityRepository activityRepository,
-        Func<string> currentDirectoryProvider)
+        Func<string> currentDirectoryProvider,
+        TextReader input)
     {
         Writer = writer;
         Executor = new CommandExecutor(writer);
@@ -21,6 +22,7 @@ public sealed class CommandContext
         DatabaseMaintenance = databaseMaintenance;
         ActivityRepository = activityRepository;
         CurrentDirectoryProvider = currentDirectoryProvider;
+        Input = input;
     }
 
     public OutputWriter Writer { get; }
@@ -36,4 +38,6 @@ public sealed class CommandContext
     public ActivityRepository ActivityRepository { get; }
 
     public Func<string> CurrentDirectoryProvider { get; }
+
+    public TextReader Input { get; }
 }

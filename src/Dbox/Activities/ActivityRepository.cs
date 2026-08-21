@@ -12,14 +12,16 @@ public sealed class ActivityRepository
         return activity;
     }
 
-    public async Task<IReadOnlyList<Activity>> ListAsync(
+    public async Task<ActivityPage> ListPageAsync(
         DboxDbContext context,
         ActivityFilter filter,
         int skip,
         int? take,
         CancellationToken cancellationToken)
     {
-        var query = ApplyFilter(context, filter)
+        var filteredQuery = ApplyFilter(context, filter);
+        var total = await filteredQuery.CountAsync(cancellationToken);
+        var query = filteredQuery
             .OrderBy(activity => activity.CreatedAt)
             .ThenBy(activity => activity.Id)
             .Skip(skip);
@@ -28,7 +30,8 @@ public sealed class ActivityRepository
             query = query.Take(take.Value);
         }
 
-        return await query.ToListAsync(cancellationToken);
+        var items = await query.ToListAsync(cancellationToken);
+        return new ActivityPage(total, items);
     }
 
     public Task<int> CountAsync(DboxDbContext context, ActivityFilter filter, CancellationToken cancellationToken) =>
@@ -136,6 +139,45 @@ public sealed class ActivityRepository
             query = query.Where(activity => activity.Status == filter.Status);
         }
 
+        if (filter.Area is not null)
+        {
+            query = query.Where(activity => activity.Area == filter.Area);
+        }
+
+        if (filter.Source is not null)
+        {
+            query = query.Where(activity => activity.Source == filter.Source);
+        }
+
+        if (filter.Effort is not null)
+        {
+            query = query.Where(activity => activity.Effort == filter.Effort);
+        }
+
+        if (filter.CreatedFrom is not null)
+        {
+            query = query.Where(activity => activity.CreatedAt >= filter.CreatedFrom.Value);
+        }
+
+        if (filter.CreatedTo is not null)
+        {
+            query = query.Where(activity => activity.CreatedAt <= filter.CreatedTo.Value);
+        }
+
+        if (filter.Title is not null)
+        {
+            var title = filter.Title.ToLowerInvariant();
+            query = query.Where(activity => activity.Title.ToLower().Contains(title));
+        }
+
+        if (filter.Description is not null)
+        {
+            var description = filter.Description.ToLowerInvariant();
+            query = query.Where(activity => activity.Description.ToLower().Contains(description));
+        }
+
         return query;
     }
 }
+
+public sealed record ActivityPage(int Total, IReadOnlyList<Activity> Items);

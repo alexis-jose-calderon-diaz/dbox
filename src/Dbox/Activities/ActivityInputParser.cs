@@ -1,75 +1,74 @@
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 
 namespace Dbox.Activities;
 
 public static class ActivityInputParser
 {
-    public static InputResult<ActivityCreateInput> ParseCreate(string? json)
-    {
-        return ParseCreateJson(json);
-    }
+    public const string ConflictingJsonSourcesMessage =
+        "Specify either '--json' or '--json-file', not both.";
 
-    public static InputResult<ActivityUpdateInput> ParseUpdate(string? json)
-    {
-        return ParseUpdateJson(json);
-    }
+    public const string UnreadableJsonInputMessage = "Unable to read JSON input.";
 
-    public static InputResult<ActivityFilter> ParseFilter(string? json)
+    public const string InvalidJsonInputMessage = "JSON input must be a valid JSON object.";
+
+    public static async Task<InputResult<string?>> ReadJsonAsync(
+        string? inlineJson,
+        string? filePath,
+        TextReader input,
+        bool required,
+        CancellationToken cancellationToken,
+        string? baseDirectory = null)
     {
-        if (json is null)
+        if (inlineJson is not null && filePath is not null)
         {
-            return InputResult<ActivityFilter>.Success(new ActivityFilter(null, null));
+            return InvalidSource(ConflictingJsonSourcesMessage);
         }
 
-        var issues = new List<ValidationIssue>();
-        string? type = null;
-        string? status = null;
-        if (string.IsNullOrWhiteSpace(json))
+        if (inlineJson is not null)
         {
-            return InputResult<ActivityFilter>.Failure(new ValidationIssue("json", "A JSON object is required."));
+            return InputResult<string?>.Success(inlineJson);
+        }
+
+        if (filePath is null)
+        {
+            return required
+                ? new InputResult<string?>(
+                    default,
+                    [new ValidationIssue("json", "A JSON input is required.")])
+                : InputResult<string?>.Success(null);
         }
 
         try
         {
-            using var document = JsonDocument.Parse(json);
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return InputResult<ActivityFilter>.Failure(new ValidationIssue("json", "The JSON input must be an object."));
-            }
-
-            foreach (var property in document.RootElement.EnumerateObject())
-            {
-                switch (property.Name)
-                {
-                    case "type":
-                        type = ReadString(property, issues);
-                        break;
-                    case "status":
-                        status = ReadString(property, issues);
-                        break;
-                    default:
-                        issues.Add(new ValidationIssue(property.Name, "Unknown property."));
-                        break;
-                }
-            }
+            var resolvedPath = filePath == "-" || Path.IsPathRooted(filePath) || baseDirectory is null
+                ? filePath
+                : Path.Combine(baseDirectory, filePath);
+            return InputResult<string?>.Success(filePath == "-"
+                ? await input.ReadToEndAsync(cancellationToken)
+                : await File.ReadAllTextAsync(
+                    resolvedPath,
+                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true),
+                    cancellationToken));
         }
-        catch (JsonException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            issues.Add(new ValidationIssue("json", "The JSON input is invalid."));
+            throw;
         }
-
-        return issues.Count > 0
-            ? new InputResult<ActivityFilter>(default, issues)
-            : InputResult<ActivityFilter>.Success(new ActivityFilter(type, status));
+        catch (Exception)
+        {
+            return InvalidSource(UnreadableJsonInputMessage);
+        }
     }
 
-    private static InputResult<ActivityCreateInput> ParseCreateJson(string? json)
+    public static InputResult<ActivityCreateInput> ParseCreate(string? json)
     {
         var values = new JsonValues();
-        var issues = ReadJsonObject(json, values);
+        var issues = ReadJsonObject(json, values, out var errorMessage);
         if (issues.Count > 0)
         {
-            return new InputResult<ActivityCreateInput>(default, issues);
+            return new InputResult<ActivityCreateInput>(default, issues, errorMessage);
         }
 
         return InputResult<ActivityCreateInput>.Success(new ActivityCreateInput(
@@ -97,13 +96,13 @@ public static class ActivityInputParser
             values.MetadataProvided));
     }
 
-    private static InputResult<ActivityUpdateInput> ParseUpdateJson(string? json)
+    public static InputResult<ActivityUpdateInput> ParseUpdate(string? json)
     {
         var values = new JsonValues();
-        var issues = ReadJsonObject(json, values);
+        var issues = ReadJsonObject(json, values, out var errorMessage);
         if (issues.Count > 0)
         {
-            return new InputResult<ActivityUpdateInput>(default, issues);
+            return new InputResult<ActivityUpdateInput>(default, issues, errorMessage);
         }
 
         return InputResult<ActivityUpdateInput>.Success(new ActivityUpdateInput
@@ -133,12 +132,107 @@ public static class ActivityInputParser
         });
     }
 
-    private static List<ValidationIssue> ReadJsonObject(string? json, JsonValues values)
+    public static InputResult<ActivityFilter> ParseFilter(string? json)
     {
+        if (json is null)
+        {
+            return InputResult<ActivityFilter>.Success(EmptyFilter());
+        }
+
         var issues = new List<ValidationIssue>();
+        string? type = null;
+        string? status = null;
+        string? area = null;
+        string? source = null;
+        string? effort = null;
+        DateTime? createdFrom = null;
+        DateTime? createdTo = null;
+        string? title = null;
+        string? description = null;
+        string? errorMessage = null;
+
         if (string.IsNullOrWhiteSpace(json))
         {
-            issues.Add(new ValidationIssue("json", "A JSON object is required."));
+            return InvalidJson<ActivityFilter>();
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return InvalidJson<ActivityFilter>();
+            }
+
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                switch (property.Name)
+                {
+                    case "type":
+                        type = ReadString(property, issues);
+                        break;
+                    case "status":
+                        status = ReadString(property, issues);
+                        break;
+                    case "area":
+                        area = ReadString(property, issues);
+                        break;
+                    case "source":
+                        source = ReadString(property, issues);
+                        break;
+                    case "effort":
+                        effort = ReadString(property, issues);
+                        break;
+                    case "created_from":
+                        createdFrom = ReadUtcDateTime(property, issues);
+                        break;
+                    case "created_to":
+                        createdTo = ReadUtcDateTime(property, issues);
+                        break;
+                    case "title":
+                        title = ReadString(property, issues);
+                        break;
+                    case "description":
+                        description = ReadString(property, issues);
+                        break;
+                    default:
+                        issues.Add(new ValidationIssue(property.Name, "Unknown property."));
+                        break;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            errorMessage = InvalidJsonInputMessage;
+            issues.Add(new ValidationIssue("json", InvalidJsonInputMessage));
+        }
+
+        var filter = new ActivityFilter(
+            type,
+            status,
+            area,
+            source,
+            effort,
+            createdFrom,
+            createdTo,
+            title,
+            description);
+        return issues.Count > 0
+            ? new InputResult<ActivityFilter>(filter, issues, errorMessage)
+            : InputResult<ActivityFilter>.Success(filter);
+    }
+
+    private static List<ValidationIssue> ReadJsonObject(
+        string? json,
+        JsonValues values,
+        out string? errorMessage)
+    {
+        var issues = new List<ValidationIssue>();
+        errorMessage = null;
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            errorMessage = InvalidJsonInputMessage;
+            issues.Add(new ValidationIssue("json", InvalidJsonInputMessage));
             return issues;
         }
 
@@ -147,7 +241,8 @@ public static class ActivityInputParser
             using var document = JsonDocument.Parse(json);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                issues.Add(new ValidationIssue("json", "The JSON input must be an object."));
+                errorMessage = InvalidJsonInputMessage;
+                issues.Add(new ValidationIssue("json", InvalidJsonInputMessage));
                 return issues;
             }
 
@@ -211,10 +306,41 @@ public static class ActivityInputParser
         }
         catch (JsonException)
         {
-            issues.Add(new ValidationIssue("json", "The JSON input is invalid."));
+            errorMessage = InvalidJsonInputMessage;
+            issues.Add(new ValidationIssue("json", InvalidJsonInputMessage));
         }
 
         return issues;
+    }
+
+    private static DateTime? ReadUtcDateTime(JsonProperty property, ICollection<ValidationIssue> issues)
+    {
+        if (property.Value.ValueKind != JsonValueKind.String ||
+            !TryParseUtcDateTime(property.Value.GetString(), out var value))
+        {
+            issues.Add(new ValidationIssue(
+                property.Name,
+                "Value must be a UTC ISO 8601 datetime with a Z offset."));
+            return null;
+        }
+
+        return value;
+    }
+
+    private static bool TryParseUtcDateTime(string? value, out DateTime result)
+    {
+        var formats = new[]
+        {
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'"
+        };
+
+        return DateTime.TryParseExact(
+            value,
+            formats,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out result);
     }
 
     private static string? ReadString(JsonProperty property, ICollection<ValidationIssue> issues)
@@ -253,6 +379,18 @@ public static class ActivityInputParser
 
         return property.Value.GetRawText();
     }
+
+    private static ActivityFilter EmptyFilter() => new(null, null, null, null, null, null, null, null, null);
+
+    private static InputResult<T> InvalidJson<T>() => new(
+        default,
+        [new ValidationIssue("json", InvalidJsonInputMessage)],
+        InvalidJsonInputMessage);
+
+    private static InputResult<string?> InvalidSource(string message) => new(
+        default,
+        [new ValidationIssue("json", message)],
+        message);
 
     private sealed class JsonValues
     {

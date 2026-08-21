@@ -14,15 +14,24 @@ public static class UpdateCommand
         {
             Description = "Activity id."
         };
-        var jsonOption = new Option<string?>("--json") { Description = "Activity update as a JSON object." };
+        var jsonOption = new Option<string?>("--json")
+        {
+            Description = "Activity update as a JSON object."
+        };
+        var jsonFileOption = new Option<string?>("--json-file")
+        {
+            Description = "Read activity update from a UTF-8 JSON file, or '-' for standard input."
+        };
         command.Arguments.Add(idArgument);
         command.Options.Add(jsonOption);
+        command.Options.Add(jsonFileOption);
         command.SetAction((parseResult, cancellationToken) => context.Executor.RunAsync(
             token => ExecuteAsync(
                 context,
                 parseResult,
                 idArgument,
                 jsonOption,
+                jsonFileOption,
                 token),
             cancellationToken));
         return command;
@@ -33,11 +42,21 @@ public static class UpdateCommand
         ParseResult parseResult,
         Argument<long> idArgument,
         Option<string?> jsonOption,
+        Option<string?> jsonFileOption,
         CancellationToken cancellationToken)
     {
-        var input = ActivityInputParser.ParseUpdate(parseResult.GetValue(jsonOption));
+        var source = await ActivityInputParser.ReadJsonAsync(
+            parseResult.GetValue(jsonOption),
+            parseResult.GetValue(jsonFileOption),
+            context.Input,
+            required: true,
+            cancellationToken,
+            baseDirectory: context.CurrentDirectoryProvider());
+        ActivityCommand.ThrowIfInvalid(source.Issues, source.ErrorMessage);
 
-        ActivityCommand.ThrowIfInvalid(input.Issues);
+        var input = ActivityInputParser.ParseUpdate(source.Value);
+
+        ActivityCommand.ThrowIfInvalid(input.Issues, input.ErrorMessage);
         var validation = ActivityValidator.ValidateUpdate(input.Value!);
         ActivityCommand.ThrowIfInvalid(validation.Issues);
 

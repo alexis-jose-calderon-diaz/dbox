@@ -26,7 +26,7 @@ public static class ActivityCommand
         return command;
     }
 
-    public static void ThrowIfInvalid(IReadOnlyList<ValidationIssue> issues)
+    public static void ThrowIfInvalid(IReadOnlyList<ValidationIssue> issues, string? message = null)
     {
         if (issues.Count == 0)
         {
@@ -34,6 +34,7 @@ public static class ActivityCommand
         }
 
         throw CliException.Validation(
-            issues.Select(issue => new ErrorDetail(issue.Field, issue.Message)).ToArray());
+            issues.Select(issue => new ErrorDetail(issue.Field, issue.Message)).ToArray(),
+            message ?? "Invalid activity.");
     }
 }

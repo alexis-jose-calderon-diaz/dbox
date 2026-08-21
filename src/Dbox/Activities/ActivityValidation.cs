@@ -79,17 +79,51 @@ public static class ActivityValidator
     public static ValidationResult ValidateFilter(ActivityFilter filter)
     {
         var issues = new List<ValidationIssue>();
-        if (filter.Type is not null && string.IsNullOrWhiteSpace(filter.Type))
-        {
-            issues.Add(new ValidationIssue("type", "Field must be a non-blank value."));
-        }
+
+        ValidateFilterString(filter.Type, "type", issues);
 
         if (filter.Status is not null && !ActivitySchema.IsStatus(filter.Status))
         {
             issues.Add(new ValidationIssue("status", $"Value must be one of: {string.Join(", ", ActivitySchema.Statuses)}."));
         }
 
+        ValidateFilterString(filter.Area, "area", issues);
+        ValidateFilterString(filter.Source, "source", issues);
+
+        if (filter.Effort is not null && !ActivitySchema.IsEffort(filter.Effort))
+        {
+            issues.Add(new ValidationIssue("effort", $"Value must be one of: {string.Join(", ", ActivitySchema.Efforts)}."));
+        }
+
+        ValidateFilterSearch(filter.Title, "title", issues);
+        ValidateFilterSearch(filter.Description, "description", issues);
+
+        if (filter.CreatedFrom is not null && filter.CreatedTo is not null &&
+            filter.CreatedFrom > filter.CreatedTo)
+        {
+            issues.Add(new ValidationIssue("created_from", "Value must not be later than created_to."));
+        }
+
         return new ValidationResult(issues);
+    }
+
+    private static void ValidateFilterString(
+        string? value,
+        string field,
+        ICollection<ValidationIssue> issues)
+    {
+        if (value is not null && string.IsNullOrWhiteSpace(value))
+        {
+            issues.Add(new ValidationIssue(field, "Field must be a non-blank value."));
+        }
+    }
+
+    private static void ValidateFilterSearch(
+        string? value,
+        string field,
+        ICollection<ValidationIssue> issues)
+    {
+        ValidateFilterString(value, field, issues);
     }
 
     private static void ValidateString(

@@ -14,10 +14,11 @@ public static class DboxCli
         TextWriter output,
         TextWriter error,
         string currentDirectory,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        TextReader? input = null)
     {
         var writer = new OutputWriter(output, error);
-        var root = BuildRootCommand(writer, () => currentDirectory);
+        var root = BuildRootCommand(writer, () => currentDirectory, input ?? Console.In);
         var parseResult = root.Parse(args);
 
         if (parseResult.Errors.Count > 0)
@@ -40,7 +41,10 @@ public static class DboxCli
         return await parseResult.InvokeAsync(configuration, cancellationToken);
     }
 
-    public static CommandRoot BuildRootCommand(OutputWriter writer, Func<string> currentDirectoryProvider)
+    public static CommandRoot BuildRootCommand(
+        OutputWriter writer,
+        Func<string> currentDirectoryProvider,
+        TextReader? input = null)
     {
         var locator = new DboxLocator();
         var contextFactory = new DboxDbContextFactory();
@@ -51,7 +55,8 @@ public static class DboxCli
             database,
             new DboxDatabaseMaintenance(locator, contextFactory),
             new ActivityRepository(),
-            currentDirectoryProvider);
+            currentDirectoryProvider,
+            input ?? Console.In);
         return RootCommandBuilder.Create(context);
     }
 }

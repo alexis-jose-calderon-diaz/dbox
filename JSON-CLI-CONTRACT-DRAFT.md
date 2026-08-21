@@ -24,7 +24,7 @@ comando + --json '{...}' -> comando -> JSON por stdout
 - `add`, `list`, `count` y `update` reciben su payload mediante `--json`.
 - `get`, `update` y `delete` reciben el identificador como argumento
   posicional: `get 1`, `update 1` y `delete 1`.
-- `init`, `context` y `activity schema` no reciben payload.
+- `init`, `context`, `backup`, `doctor` y `activity schema` no reciben payload.
 - `activity delete <id> --yes` es la forma persistente y requiere confirmacion
   explicita.
 - `activity delete <id> --dry-run` previsualiza sin migrar ni persistir; si se
@@ -41,6 +41,8 @@ comando + --json '{...}' -> comando -> JSON por stdout
 | --- | --- | --- |
 | `dbox init` | Ninguna | Objeto de inicializacion |
 | `dbox context` | Ninguna | Contexto de descubrimiento |
+| `dbox backup` | Ninguna | Referencia al backup creado |
+| `dbox doctor` | Ninguna | Diagnostico read-only de la base |
 | `dbox activity schema` | Ninguna | Documento de schema |
 | `dbox activity add --json '{...}'` | Objeto de actividad | Actividad creada |
 | `dbox activity list [--json '{...}']` | Filtros opcionales | Arreglo de actividades |
@@ -74,7 +76,47 @@ Usage:
 Commands:
   init                 Initialize the database in the current directory.
   context              Show the discovered project context.
+  backup               Create a consistent backup of the project database.
+  doctor               Diagnose the project database without modifying it.
   activity             Manage the activity catalog.
+
+Options:
+  --help               Show command line help.
+```
+
+### `dbox backup --help`
+
+```bash
+dbox backup --help
+```
+
+Salida:
+
+```text
+Description:
+  Create a consistent backup of the project database.
+
+Usage:
+  dbox backup [options]
+
+Options:
+  --help               Show command line help.
+```
+
+### `dbox doctor --help`
+
+```bash
+dbox doctor --help
+```
+
+Salida:
+
+```text
+Description:
+  Diagnose the project database without modifying it.
+
+Usage:
+  dbox doctor [options]
 
 Options:
   --help               Show command line help.
@@ -276,6 +318,78 @@ Sin una carpeta `.dbox`:
   "database": null
 }
 ```
+
+## Mantenimiento de la base de datos
+
+Los comandos `backup` y `doctor` resuelven la base `.dbox/data.db` mas cercana
+con las reglas normales de descubrimiento. No reciben payload JSON ni aplican
+migraciones de EF Core.
+
+### `dbox backup`
+
+`backup` crea una copia online consistente mediante SQLite. La carpeta de
+destino se crea bajo `.dbox/backups` y el nombre usa un timestamp UTC con el
+formato `data-<YYYYMMDD>T<HHmmssfff>Z.db`. La ruta devuelta es relativa a la
+raiz del proyecto resuelto, no al directorio desde el que se ejecuta el comando.
+
+```bash
+dbox backup
+```
+
+Respuesta exitosa:
+
+```json
+{
+  "database": ".dbox/data.db",
+  "backup": ".dbox/backups/data-20260821T120000000Z.db"
+}
+```
+
+El origen se abre sin permiso de escritura y la copia no modifica la base
+fuente. Si no se encuentra una base de proyecto, devuelve `database_not_found`
+con exit code `4`. Si no se puede crear la carpeta o completar la copia,
+devuelve `database_error` con exit code `4` y no informa un backup exitoso.
+
+### `dbox doctor`
+
+`doctor` es estrictamente read-only. No crea carpetas, no escribe archivos, no
+repara la base y no aplica migraciones. Comprueba apertura, integridad SQLite,
+migraciones conocidas pendientes y permisos inspeccionables.
+
+```bash
+dbox doctor
+```
+
+Respuesta para una base sana:
+
+```json
+{
+  "database": ".dbox/data.db",
+  "exists": true,
+  "can_open": true,
+  "integrity": "ok",
+  "pending_migrations": [],
+  "permissions": {
+    "database_readable": true,
+    "database_writable": true,
+    "backup_directory_writable": null
+  }
+}
+```
+
+`integrity` puede ser `ok`, `failed` o `not_checked`. Si la base no se puede
+abrir, `can_open` es `false`, `integrity` es `not_checked` y
+`pending_migrations` es `null`. Un diagnostico no saludable que se puede
+construir sigue siendo una respuesta exitosa de `doctor`; los fallos que
+impiden construir el diagnostico completo devuelven `database_error`.
+
+Los campos de `permissions` son informativos. Cada valor puede ser `true`,
+`false` o `null` cuando la plataforma o la ausencia de la carpeta impide
+determinarlo sin realizar una escritura. La carpeta `.dbox/backups` no se crea
+como parte de `doctor`.
+
+Si no se encuentra una base de proyecto, `doctor` devuelve el error
+`database_not_found` con exit code `4` y no crea archivos del proyecto.
 
 ## Schema del catalogo
 

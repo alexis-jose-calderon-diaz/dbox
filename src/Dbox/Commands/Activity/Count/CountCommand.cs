@@ -11,10 +11,18 @@ public static class CountCommand
     public static Command Create(CommandContext context)
     {
         var command = new Command("count", "Count activities.");
-        var jsonOption = new Option<string?>("--json") { Description = "Filters as a JSON object." };
+        var jsonOption = new Option<string?>("--json")
+        {
+            Description = "Filters as a JSON object: type, status, area, source, effort, created_from, created_to, title, description."
+        };
+        var jsonFileOption = new Option<string?>("--json-file")
+        {
+            Description = "Read filters from a UTF-8 JSON file, or '-' for standard input."
+        };
         command.Options.Add(jsonOption);
+        command.Options.Add(jsonFileOption);
         command.SetAction((parseResult, cancellationToken) => context.Executor.RunAsync(
-            token => ExecuteAsync(context, parseResult, jsonOption, token),
+            token => ExecuteAsync(context, parseResult, jsonOption, jsonFileOption, token),
             cancellationToken));
         return command;
     }
@@ -23,10 +31,19 @@ public static class CountCommand
         CommandContext context,
         ParseResult parseResult,
         Option<string?> jsonOption,
+        Option<string?> jsonFileOption,
         CancellationToken cancellationToken)
     {
-        var filter = ActivityInputParser.ParseFilter(parseResult.GetValue(jsonOption));
-        ActivityCommand.ThrowIfInvalid(filter.Issues);
+        var source = await ActivityInputParser.ReadJsonAsync(
+            parseResult.GetValue(jsonOption),
+            parseResult.GetValue(jsonFileOption),
+            context.Input,
+            required: false,
+            cancellationToken);
+        ActivityCommand.ThrowIfInvalid(source.Issues, source.ErrorMessage);
+
+        var filter = ActivityInputParser.ParseFilter(source.Value);
+        ActivityCommand.ThrowIfInvalid(filter.Issues, filter.ErrorMessage);
         var validation = ActivityValidator.ValidateFilter(filter.Value!);
         ActivityCommand.ThrowIfInvalid(validation.Issues);
 
