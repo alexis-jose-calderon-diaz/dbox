@@ -8,12 +8,14 @@ public sealed class CommandContext
 {
     public CommandContext(
         OutputWriter writer,
+        DboxLocator locator,
         DboxDatabase database,
         ActivityRepository activityRepository,
         Func<string> currentDirectoryProvider)
     {
         Writer = writer;
         Executor = new CommandExecutor(writer);
+        Locator = locator;
         Database = database;
         ActivityRepository = activityRepository;
         CurrentDirectoryProvider = currentDirectoryProvider;
@@ -22,6 +24,8 @@ public sealed class CommandContext
     public OutputWriter Writer { get; }
 
     public CommandExecutor Executor { get; }
+
+    public DboxLocator Locator { get; }
 
     public DboxDatabase Database { get; }
 

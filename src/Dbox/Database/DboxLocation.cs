@@ -1,7 +1,18 @@
 namespace Dbox.Database;
 
+public enum DboxDiscoveryStatus
+{
+    Found,
+    Incomplete,
+    NotFound
+}
+
 public sealed record DboxLocation(
-    string ProjectDirectory,
-    string DboxDirectory,
-    string DatabasePath,
-    bool DatabaseExists);
+    string CurrentDirectory,
+    string? ProjectDirectory,
+    string? DboxDirectory,
+    string? DatabasePath,
+    DboxDiscoveryStatus Status)
+{
+    public bool DatabaseExists => Status == DboxDiscoveryStatus.Found;
+}

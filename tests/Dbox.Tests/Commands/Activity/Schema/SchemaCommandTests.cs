@@ -9,7 +9,6 @@ public sealed class SchemaCommandTests
     public async Task SchemaUsesTheStableJsonContractWithoutAliases()
     {
         using var project = new TestProject();
-        await TestProject.RunAsync(project.Root, "init");
 
         var schema = await TestProject.RunAsync(project.Root, "activity", "schema");
         var alias = await TestProject.RunAsync(project.Root, "activity", "--schema");
@@ -43,5 +42,22 @@ public sealed class SchemaCommandTests
         Assert.Equal("json", fields.GetProperty("metadata").GetProperty("type").GetString());
         Assert.False(fields.GetProperty("metadata").GetProperty("required").GetBoolean());
         Assert.True(fields.GetProperty("metadata").GetProperty("nullable").GetBoolean());
+        Assert.False(Directory.Exists(Path.Combine(project.Root, ".dbox")));
+    }
+
+    [Fact]
+    public async Task SchemaDoesNotMigrateAnExistingDatabase()
+    {
+        using var project = new TestProject();
+        var databaseDirectory = Path.Combine(project.Root, ".dbox");
+        var databasePath = Path.Combine(databaseDirectory, "data.db");
+        Directory.CreateDirectory(databaseDirectory);
+        File.WriteAllBytes(databasePath, []);
+        var before = File.ReadAllBytes(databasePath);
+
+        var schema = await TestProject.RunAsync(project.Root, "activity", "schema");
+
+        Assert.Equal(0, schema.ExitCode);
+        Assert.Equal(before, File.ReadAllBytes(databasePath));
     }
 }

@@ -16,6 +16,7 @@ public sealed class RootCommandTests
         Assert.Equal(0, rootHelp.ExitCode);
         Assert.Empty(rootHelp.Error);
         Assert.Contains("init", rootHelp.Output);
+        Assert.Contains("context", rootHelp.Output);
         Assert.Contains("activity", rootHelp.Output);
         Assert.DoesNotContain("schema", rootHelp.Output);
         Assert.DoesNotContain("add", rootHelp.Output);

@@ -46,6 +46,7 @@ public static class DboxCli
         var contextFactory = new DboxDbContextFactory();
         var context = new CommandContext(
             writer,
+            locator,
             new DboxDatabase(locator, contextFactory),
             new ActivityRepository(),
             currentDirectoryProvider);

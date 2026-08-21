@@ -1,3 +1,4 @@
+using Dbox.Database;
 using Dbox.Tests.Support;
 
 namespace Dbox.Tests.Commands.Init;
@@ -53,5 +54,84 @@ public sealed class InitCommandTests
 
         Assert.Equal(0, init.ExitCode);
         Assert.Contains("\"status\": \"migrated\"", init.Output);
+    }
+
+    [Fact]
+    public async Task InitUsesPrivateModesOnLinuxAndPreservesExistingArtifacts()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        using var project = new TestProject();
+        var firstInit = await TestProject.RunAsync(project.Root, "init");
+        var databaseDirectory = Path.Combine(project.Root, ".dbox");
+        var databasePath = Path.Combine(databaseDirectory, "data.db");
+
+        await TestProject.RunAsync(
+            project.Root,
+            "activity",
+            "add",
+            "--json",
+            "{\"type\":\"research\",\"title\":\"Preserve me\",\"description\":\"Details\",\"status\":\"completed\",\"source\":\"manual\",\"area\":\"backend\",\"result\":\"Result\",\"impact\":\"Impact\",\"effort\":\"low\"}");
+        var broadMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                        UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+                        UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+        File.SetUnixFileMode(databaseDirectory, broadMode);
+        File.SetUnixFileMode(databasePath, broadMode);
+
+        var secondInit = await TestProject.RunAsync(project.Root, "init");
+        var list = await TestProject.RunAsync(project.Root, "activity", "list");
+        var privateDirectoryMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        var privateFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+
+        Assert.Equal(0, firstInit.ExitCode);
+        Assert.Equal(0, secondInit.ExitCode);
+        Assert.Equal(privateDirectoryMode, File.GetUnixFileMode(databaseDirectory));
+        Assert.Equal(privateFileMode, File.GetUnixFileMode(databasePath));
+
+        Assert.Contains("Preserve me", list.Output);
+    }
+
+    [Fact]
+    public void LinuxPermissionHardeningNormalizesPresentSqliteSidecars()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        using var project = new TestProject();
+        var databaseDirectory = Path.Combine(project.Root, ".dbox");
+        var databasePath = Path.Combine(databaseDirectory, "data.db");
+        Directory.CreateDirectory(databaseDirectory);
+        File.WriteAllBytes(databasePath, [1, 2, 3]);
+        var sidecars = new[] { "-wal", "-shm", "-journal" }
+            .Select(suffix => databasePath + suffix)
+            .ToArray();
+        foreach (var sidecar in sidecars)
+        {
+            File.WriteAllBytes(sidecar, [4, 5, 6]);
+        }
+
+        var broadMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                        UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+                        UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+        File.SetUnixFileMode(databasePath, broadMode);
+        foreach (var sidecar in sidecars)
+        {
+            File.SetUnixFileMode(sidecar, broadMode);
+        }
+
+        DboxFilePermissions.HardenDatabase(databasePath);
+
+        var privateFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        Assert.Equal(privateFileMode, File.GetUnixFileMode(databasePath));
+        foreach (var sidecar in sidecars)
+        {
+            Assert.Equal(privateFileMode, File.GetUnixFileMode(sidecar));
+            Assert.Equal(new byte[] { 4, 5, 6 }, File.ReadAllBytes(sidecar));
+        }
     }
 }

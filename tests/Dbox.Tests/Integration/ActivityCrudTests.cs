@@ -48,7 +48,7 @@ public sealed class ActivityCrudTests
             "1",
             "--json",
             "{\"id\":99}");
-        var deleted = await TestProject.RunAsync(project.Root, "activity", "delete", "1");
+        var deleted = await TestProject.RunAsync(project.Root, "activity", "delete", "1", "--yes");
         var missing = await TestProject.RunAsync(project.Root, "activity", "get", "1");
         using var listDocument = JsonDocument.Parse(list.Output);
         using var filteredDocument = JsonDocument.Parse(filteredList.Output);

@@ -10,10 +10,7 @@ public static class SchemaCommand
     {
         var command = new Command("schema", "Show the public activity contract.");
         command.SetAction((_, cancellationToken) => context.Executor.RunAsync(
-            token => context.Database.ExecuteAsync(
-                context.CurrentDirectoryProvider(),
-                (_, _) => Task.FromResult<object?>(ActivitySchema.CreateDocument()),
-                token),
+            _ => Task.FromResult<object?>(ActivitySchema.CreateDocument()),
             cancellationToken));
         return command;
     }

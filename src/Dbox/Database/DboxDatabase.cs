@@ -13,22 +13,34 @@ public sealed class DboxDatabase(DboxLocator locator, DboxDbContextFactory conte
 
         try
         {
-            Directory.CreateDirectory(location.DboxDirectory);
-            await using var context = contextFactory.Create(location.DatabasePath);
-            if (!existed)
+            Directory.CreateDirectory(location.DboxDirectory!);
+            DboxFilePermissions.HardenDirectory(location.DboxDirectory!);
+
+            string status;
+            await using (var context = contextFactory.Create(location.DatabasePath!))
             {
-                await context.Database.MigrateAsync(cancellationToken);
-                return new InitResponse(".dbox/data.db", "initialized");
+                if (!existed)
+                {
+                    await context.Database.MigrateAsync(cancellationToken);
+                    status = "initialized";
+                }
+                else
+                {
+                    var pending = (await context.Database.GetPendingMigrationsAsync(cancellationToken)).ToArray();
+                    if (pending.Length > 0)
+                    {
+                        await context.Database.MigrateAsync(cancellationToken);
+                        status = "migrated";
+                    }
+                    else
+                    {
+                        status = "already_initialized";
+                    }
+                }
             }
 
-            var pending = (await context.Database.GetPendingMigrationsAsync(cancellationToken)).ToArray();
-            if (pending.Length > 0)
-            {
-                await context.Database.MigrateAsync(cancellationToken);
-                return new InitResponse(".dbox/data.db", "migrated");
-            }
-
-            return new InitResponse(".dbox/data.db", "already_initialized");
+            DboxFilePermissions.HardenDatabase(location.DatabasePath!);
+            return new InitResponse(".dbox/data.db", status);
         }
         catch (OperationCanceledException)
         {
@@ -45,8 +57,25 @@ public sealed class DboxDatabase(DboxLocator locator, DboxDbContextFactory conte
         Func<DboxDbContext, CancellationToken, Task<TResult>> operation,
         CancellationToken cancellationToken)
     {
+        return await ExecuteCoreAsync(startingDirectory, operation, migrate: true, cancellationToken);
+    }
+
+    public async Task<TResult> ExecuteWithoutMigrationAsync<TResult>(
+        string startingDirectory,
+        Func<DboxDbContext, CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken)
+    {
+        return await ExecuteCoreAsync(startingDirectory, operation, migrate: false, cancellationToken);
+    }
+
+    private async Task<TResult> ExecuteCoreAsync<TResult>(
+        string startingDirectory,
+        Func<DboxDbContext, CancellationToken, Task<TResult>> operation,
+        bool migrate,
+        CancellationToken cancellationToken)
+    {
         var location = locator.Find(startingDirectory);
-        if (location is null || !location.DatabaseExists)
+        if (!location.DatabaseExists || location.DatabasePath is null)
         {
             throw CliException.DatabaseNotFound();
         }
@@ -54,7 +83,11 @@ public sealed class DboxDatabase(DboxLocator locator, DboxDbContextFactory conte
         try
         {
             await using var context = contextFactory.Create(location.DatabasePath);
-            await context.Database.MigrateAsync(cancellationToken);
+            if (migrate)
+            {
+                await context.Database.MigrateAsync(cancellationToken);
+            }
+
             return await operation(context, cancellationToken);
         }
         catch (CliException)
@@ -70,4 +103,5 @@ public sealed class DboxDatabase(DboxLocator locator, DboxDbContextFactory conte
             throw CliException.Database(exception);
         }
     }
+
 }

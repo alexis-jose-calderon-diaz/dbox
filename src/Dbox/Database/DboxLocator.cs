@@ -7,12 +7,22 @@ public sealed class DboxLocator
         var projectDirectory = NormalizeDirectory(currentDirectory);
         var dboxDirectory = Path.Combine(projectDirectory, ".dbox");
         var databasePath = Path.Combine(dboxDirectory, "data.db");
-        return new DboxLocation(projectDirectory, dboxDirectory, databasePath, File.Exists(databasePath));
+        return new DboxLocation(
+            projectDirectory,
+            projectDirectory,
+            dboxDirectory,
+            databasePath,
+            File.Exists(databasePath)
+                ? DboxDiscoveryStatus.Found
+                : Directory.Exists(dboxDirectory)
+                    ? DboxDiscoveryStatus.Incomplete
+                    : DboxDiscoveryStatus.NotFound);
     }
 
-    public DboxLocation? Find(string startingDirectory)
+    public DboxLocation Find(string startingDirectory)
     {
         var currentDirectory = NormalizeDirectory(startingDirectory);
+        var cwd = currentDirectory;
 
         while (true)
         {
@@ -21,16 +31,19 @@ public sealed class DboxLocator
             {
                 var databasePath = Path.Combine(dboxDirectory, "data.db");
                 return new DboxLocation(
+                    cwd,
                     currentDirectory,
                     dboxDirectory,
                     databasePath,
-                    File.Exists(databasePath));
+                    File.Exists(databasePath)
+                        ? DboxDiscoveryStatus.Found
+                        : DboxDiscoveryStatus.Incomplete);
             }
 
             var parent = Directory.GetParent(currentDirectory);
             if (parent is null)
             {
-                return null;
+                return new DboxLocation(cwd, null, null, null, DboxDiscoveryStatus.NotFound);
             }
 
             currentDirectory = parent.FullName;

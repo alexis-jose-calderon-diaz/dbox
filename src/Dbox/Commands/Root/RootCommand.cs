@@ -2,6 +2,7 @@ using System.CommandLine;
 using CommandRoot = System.CommandLine.RootCommand;
 using Dbox.Cli;
 using Dbox.Commands.Activity;
+using Dbox.Commands.Context;
 using Dbox.Commands.Init;
 
 namespace Dbox.Commands.Root;
@@ -20,6 +21,7 @@ public static class RootCommand
             rootCommand: true));
 
         root.Add(InitCommand.Create(context));
+        root.Add(ContextCommand.Create(context));
         root.Add(ActivityCommand.Create(context));
         return root;
     }
