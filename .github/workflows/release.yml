@@ -100,7 +100,7 @@ jobs:
       matrix:
         include:
           - name: macOS x64
-            runner: macos-13
+            runner: macos-15-intel
             asset: dbox-osx-x64
           - name: Windows x64
             runner: windows-latest
