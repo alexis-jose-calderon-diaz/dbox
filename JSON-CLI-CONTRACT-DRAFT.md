@@ -24,7 +24,11 @@ comando + --json '{...}' -> comando -> JSON por stdout
 - `add`, `list`, `count` y `update` reciben su payload mediante `--json`.
 - `get`, `update` y `delete` reciben el identificador como argumento
   posicional: `get 1`, `update 1` y `delete 1`.
-- `init` y `activity schema` no reciben payload.
+- `init`, `context` y `activity schema` no reciben payload.
+- `activity delete <id> --yes` es la forma persistente y requiere confirmacion
+  explicita.
+- `activity delete <id> --dry-run` previsualiza sin migrar ni persistir; si se
+  combinan `--dry-run` y `--yes`, prevalece `--dry-run`.
 - La CLI no lee payloads desde `stdin`.
 - No se aceptan arreglos JSON ni propiedades desconocidas en los payloads.
 - `--help` conserva la ayuda textual natural de una herramienta CLI.
@@ -36,13 +40,15 @@ comando + --json '{...}' -> comando -> JSON por stdout
 | Comando | Entrada | Respuesta exitosa |
 | --- | --- | --- |
 | `dbox init` | Ninguna | Objeto de inicializacion |
+| `dbox context` | Ninguna | Contexto de descubrimiento |
 | `dbox activity schema` | Ninguna | Documento de schema |
 | `dbox activity add --json '{...}'` | Objeto de actividad | Actividad creada |
 | `dbox activity list [--json '{...}']` | Filtros opcionales | Arreglo de actividades |
 | `dbox activity count [--json '{...}']` | Filtros opcionales | Objeto con `count` |
 | `dbox activity get 15` | ID posicional | Actividad solicitada |
 | `dbox activity update 15 --json '{...}'` | Campos modificables | Actividad actualizada |
-| `dbox activity delete 15` | ID posicional | Confirmacion de borrado |
+| `dbox activity delete 15 --yes` | ID y confirmacion | Confirmacion de borrado |
+| `dbox activity delete 15 --dry-run` | ID y previsualizacion | Actividad a eliminar |
 
 ## Ayuda
 
@@ -67,7 +73,27 @@ Usage:
 
 Commands:
   init                 Initialize the database in the current directory.
+  context              Show the discovered project context.
   activity             Manage the activity catalog.
+
+Options:
+  --help               Show command line help.
+```
+
+### `dbox context --help`
+
+```bash
+dbox context --help
+```
+
+Salida:
+
+```text
+Description:
+  Show the discovered project context.
+
+Usage:
+  dbox context [options]
 
 Options:
   --help               Show command line help.
@@ -122,8 +148,8 @@ Options:
 ```
 
 `list --help` tambien muestra `--skip` y `--take`. `get`, `update` y `delete`
-muestran que el ID es un argumento posicional. Los detalles de campos y enums
-se descubren con `dbox activity schema`.
+muestran que el ID es un argumento posicional. `delete --help` tambien muestra
+`--yes` y `--dry-run`. Los detalles de campos y enums se descubren con `dbox activity schema`.
 
 Ejemplo de ayuda de `list`:
 
@@ -142,6 +168,28 @@ Options:
   --json <json>         Optional filters as a JSON object.
   --skip <skip>         Number of ordered records to skip. (Default: 0)
   --take <take>         Maximum number of records to return.
+  --help                Show command line help.
+```
+
+Ejemplo de ayuda de `delete`:
+
+```bash
+dbox activity delete --help
+```
+
+```text
+Description:
+  Delete an activity.
+
+Usage:
+  dbox activity delete <id> [options]
+
+Arguments:
+  <id>                  Activity id.
+
+Options:
+  --yes                 Confirm the permanent deletion.
+  --dry-run             Preview the deletion without changing the database.
   --help                Show command line help.
 ```
 
@@ -179,6 +227,53 @@ Base existente con migraciones pendientes:
 {
   "database": ".dbox/data.db",
   "status": "migrated"
+}
+```
+
+## Contexto del proyecto
+
+### `dbox context`
+
+`context` inspecciona el resultado del descubrimiento sin crear, abrir ni
+migrar una base. Siempre devuelve un objeto JSON con exit code `0`.
+
+```bash
+dbox context
+```
+
+Proyecto encontrado:
+
+```json
+{
+  "status": "found",
+  "cwd": "/workspace/src",
+  "project_directory": "/workspace",
+  "dbox_directory": "/workspace/.dbox",
+  "database": "/workspace/.dbox/data.db"
+}
+```
+
+Limite de proyecto incompleto, sin buscar una base en un ancestro:
+
+```json
+{
+  "status": "incomplete",
+  "cwd": "/workspace/module",
+  "project_directory": "/workspace/module",
+  "dbox_directory": "/workspace/module/.dbox",
+  "database": "/workspace/module/.dbox/data.db"
+}
+```
+
+Sin una carpeta `.dbox`:
+
+```json
+{
+  "status": "not_found",
+  "cwd": "/tmp/workspace",
+  "project_directory": null,
+  "dbox_directory": null,
+  "database": null
 }
 ```
 
@@ -541,10 +636,13 @@ Reglas de entrada:
 
 ## Eliminar una actividad
 
-### `dbox activity delete <id>`
+### Eliminacion persistente: `dbox activity delete <id> --yes`
+
+La opcion `--yes` es obligatoria para persistir la eliminacion. No se muestra
+una confirmacion interactiva ni se usa una papelera.
 
 ```bash
-dbox activity delete 15
+dbox activity delete 15 --yes
 ```
 
 Respuesta:
@@ -555,6 +653,50 @@ Respuesta:
   "deleted": true
 }
 ```
+
+### Previsualizacion: `dbox activity delete <id> --dry-run`
+
+`--dry-run` resuelve y lee la actividad sin aplicar migraciones ni guardar
+cambios. No requiere `--yes`.
+
+```bash
+dbox activity delete 15 --dry-run
+```
+
+Respuesta:
+
+```json
+{
+  "id": 15,
+  "deleted": false,
+  "dry_run": true,
+  "activity": {
+    "id": 15,
+    "created_at": "2026-08-20T11:30:00Z",
+    "type": "implementation",
+    "title": "Implementar refresh token",
+    "description": "Agrega soporte de refresh token",
+    "status": "completed",
+    "source": "manual",
+    "area": "backend",
+    "result": "El flujo queda disponible",
+    "impact": "Mejora la continuidad de sesion",
+    "effort": "medium",
+    "reference": null,
+    "metadata": null
+  }
+}
+```
+
+Cuando se proporcionan ambas opciones, la previsualizacion tiene prioridad y
+no se elimina la actividad:
+
+```bash
+dbox activity delete 15 --yes --dry-run
+```
+
+Sin `--yes` ni `--dry-run`, el comando devuelve `validation_error` y no cambia
+la base.
 
 ## Errores
 
@@ -796,6 +938,7 @@ Las siguientes formas ya no serian validas:
 | `printf '%s' '{"status":"completed"}' \| dbox activity update 15` | `dbox activity update 15 --json '{"status":"completed"}'` |
 | `dbox activity update 15 --status completed` | `dbox activity update 15 --json '{"status":"completed"}'` |
 | `dbox --schema` | `dbox activity schema` |
+| `dbox activity delete 15` | `dbox activity delete 15 --yes` o `dbox activity delete 15 --dry-run` |
 
 Todas las formas eliminadas devuelven `validation_error` en JSON y no ejecutan
 ninguna operacion sobre la base.
