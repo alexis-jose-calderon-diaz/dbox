@@ -23,6 +23,12 @@ Un workflow de GitHub Actions se activara con tags de version y ejecutara una ma
 
 Esto evita almacenar binarios en Git y permite que cada release sea reproducible desde el tag. La alternativa de publicar manualmente desde una maquina de desarrollo se descarta porque puede omitir plataformas o producir assets inconsistentes.
 
+Un job de validacion ejecutara `dotnet test Dbox.sln` antes de la matriz de publicacion. Un job Windows ejecutara `install.ps1` con `%LOCALAPPDATA%` temporal y sustituira `Invoke-WebRequest` para comprobar su diagnostico de descarga sin efectuar otra instalacion. Despues de publicar los artefactos, smoke tests en macOS y Windows ejecutaran `dbox --version` sobre los binarios x64 nativos antes de crear la release. El token tendra `contents: read` por defecto y solo el job de release elevara a `contents: write`. La creacion de la release enumerara los cinco archivos esperados, en lugar de usar un glob que podria incorporar artefactos ajenos. Las actions se usaran en versiones con runtime Node.js mantenido y fijadas por SHA completo para que sus dependencias sean inmutables.
+
+### Notas de release generadas
+
+El job de release construira un bloque Markdown con la version, commit, enlace a la ejecucion, tabla de assets y comandos de instalacion y verificacion. `gh release create` recibira ese bloque mediante `--notes`, junto con `--generate-notes`, para anteponer la informacion operativa al changelog que genera GitHub. Tambien usara un titulo explicito `dbox <tag>` y `--verify-tag` para no crear tags implícitos.
+
 ### Descargar mediante la ruta `releases/latest/download`
 
 Los instaladores descargaran `https://github.com/alexis-jose-calderon-diaz/dbox/releases/latest/download/<asset>`. GitHub resuelve esa ruta a la ultima release estable y redirige al asset exacto, sin exponer tokens ni requerir una herramienta para interpretar la API de Releases.
@@ -46,6 +52,9 @@ Ejecutar un asset de otra arquitectura mediante emulacion se descarta para mante
 ## Risks / Trade-offs
 
 - [Una release no contiene un asset esperado o GitHub devuelve un error HTTP] → Las descargas usan opciones que convierten errores HTTP en fallos y los scripts imprimen un diagnostico que identifica el asset y la URL.
+- [Una regresion llega a una release] → El workflow ejecuta la suite de pruebas antes de publicar y bloquea los jobs posteriores si falla.
+- [Un binario de macOS o Windows no inicia] → Los runners nativos ejecutan una comprobacion `--version` antes de crear la release.
+- [Un artefacto ajeno se adjunta a la release] → El comando de creacion enumera los cinco archivos permitidos de forma explicita.
 - [Un ejecutable `dbox` anterior aparece antes en `PATH`] → Los scripts anteponen temporalmente su directorio de destino antes de verificar `dbox --version`.
 - [El binario de Windows esta bloqueado por un proceso en ejecucion] → El instalador falla sin reemplazar parcialmente el ejecutable y comunica el error de copia.
 - [No se publica Windows ARM64] → El instalador rechaza esa arquitectura de forma explicita hasta que exista un asset dedicado.

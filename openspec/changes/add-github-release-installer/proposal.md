@@ -8,6 +8,8 @@ Usar `dbox` hoy requiere clonar el repositorio y disponer del SDK de .NET. Una d
 - Agregar instaladores de usuario para Linux/macOS (`install.sh`) y Windows (`install.ps1`) que descarguen el artefacto apropiado de la ultima release estable.
 - Instalar la CLI en una ruta de usuario, configurar o indicar la configuracion necesaria de `PATH`, y verificar la instalacion con `dbox --version`.
 - Crear documentacion de instalacion y verificacion en el README.
+- Validar la solucion antes de publicar, limitar el token de GitHub al job que crea la release y generar notas con instrucciones, assets, procedencia y changelog.
+- Ejecutar en Windows una comprobacion aislada de `install.ps1` antes de publicar binarios.
 
 ## Capabilities
 

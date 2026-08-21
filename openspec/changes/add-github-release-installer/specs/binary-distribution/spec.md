@@ -11,6 +11,32 @@ Cada GitHub Release de `dbox` SHALL incluir binarios `self-contained` y `single-
 - **WHEN** se crea una release de `dbox`
 - **THEN** sus assets contienen exactamente un ejecutable con el nombre esperado para cada una de las cinco plataformas soportadas
 
+### Requirement: Verified and least-privilege release workflow
+El workflow de release SHALL ejecutar `dotnet test Dbox.sln` correctamente antes de publicar binarios, ejecutar `install.ps1` en un directorio `%LOCALAPPDATA%` temporal de un runner Windows x64 y comprobar su error de descarga HTTP, y ejecutar `dbox --version` con los binarios `osx-x64` y `win-x64` en runners de sus plataformas de destino. Los jobs de validacion y publicacion SHALL tener solo permiso de lectura de contenidos; unicamente el job que crea la GitHub Release tendra `contents: write`. El job de release SHALL adjuntar explicitamente los cinco assets contractuales y no cualquier artefacto disponible en la ejecucion.
+
+#### Scenario: Failing tests prevent a release
+- **WHEN** `dotnet test Dbox.sln` falla durante una ejecucion activada por un tag
+- **THEN** no se publican binarios ni se crea una GitHub Release
+
+#### Scenario: Release attaches only contract assets
+- **WHEN** la ejecucion contiene un artefacto adicional ajeno a la distribucion de `dbox`
+- **THEN** la GitHub Release solo adjunta los cinco ejecutables definidos por el contrato
+
+#### Scenario: Cross-platform binaries start before release
+- **WHEN** los assets para macOS x64 y Windows x64 se han publicado como artefactos del workflow
+- **THEN** cada binario ejecuta `dbox --version` correctamente en un runner de su plataforma antes de crear la GitHub Release
+
+#### Scenario: Windows installer validates download behavior
+- **WHEN** una ejecucion activada por un tag valida `install.ps1` en un runner Windows x64
+- **THEN** el instalador usa un directorio temporal, ejecuta `dbox --version` y su fallo HTTP contiene un mensaje de descarga entendible
+
+### Requirement: Informative release notes
+Cada GitHub Release de `dbox` SHALL tener un titulo `dbox <tag>` y notas que identifiquen la version, commit de origen, enlace a la ejecucion, plataformas y nombres de assets, comandos de instalacion y verificacion, y el changelog generado por GitHub.
+
+#### Scenario: User consults a release
+- **WHEN** una persona abre una GitHub Release de `dbox`
+- **THEN** puede identificar que binarios contiene, como instalar la CLI, como verificarla y los cambios incluidos sin depender unicamente del nombre del tag
+
 ### Requirement: Unix installer selects and installs the platform binary
 El repositorio SHALL incluir `install.sh`, ejecutable mediante una tuberia con `bash`, que detecte Linux o macOS y las arquitecturas x64 o ARM64, descargue el asset correspondiente de la ultima GitHub Release estable e instale `dbox` en `~/.local/bin/dbox`. El instalador SHALL crear el directorio si no existe, asignar permiso de ejecucion al archivo instalado y no requerir `sudo` ni el SDK de .NET.
 
