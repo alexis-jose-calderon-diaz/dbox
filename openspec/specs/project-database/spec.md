@@ -81,6 +81,17 @@ schema` SHALL not perform this discovery.
 - **WHEN** no valid `.dbox/data.db` is found before reaching the filesystem root
 - **THEN** the command stops before its main operation and returns the database-not-found result defined by the CLI contract
 
+### Requirement: Root maintenance operations avoid migration
+
+Root maintenance commands SHALL resolve the same project database as catalog
+commands without applying migrations. `dbox backup` and `dbox doctor` SHALL not
+call the catalog data-operation migration path.
+
+#### Scenario: Run a maintenance command against a database with pending migrations
+
+- **WHEN** `dbox backup` or `dbox doctor` resolves a database that has pending known migrations
+- **THEN** the command does not apply migrations before or after its maintenance operation
+
 ### Requirement: Automatic migration before data operations
 
 Every catalog command that resolves a project database to execute a data

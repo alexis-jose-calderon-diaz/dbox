@@ -9,14 +9,14 @@ Define stable command-line output, error, alias, and exit-code behavior so peopl
 ### Requirement: Root infrastructure and catalog hierarchy
 
 The root `dbox` command SHALL expose only shared infrastructure operations and
-available catalog groups. `init` and `context` SHALL be root infrastructure
-operations, and `activity` SHALL be the available catalog group. Catalog-specific
-operations SHALL NOT be exposed directly at the root.
+available catalog groups. `init`, `context`, `backup`, and `doctor` SHALL be root
+infrastructure operations, and `activity` SHALL be the available catalog group.
+Catalog-specific operations SHALL NOT be exposed directly at the root.
 
 #### Scenario: Discover root operations
 
 - **WHEN** a user requests root help
-- **THEN** the help presents `init`, `context`, and the `activity` catalog group, and does not present activity CRUD or schema commands as root commands
+- **THEN** the help presents `init`, `context`, `backup`, `doctor`, and the `activity` catalog group, and does not present activity CRUD or schema commands as root commands
 
 #### Scenario: Reject a removed flat activity command
 
@@ -38,6 +38,24 @@ be accepted.
 
 - **WHEN** a user invokes `dbox activity --schema` or `dbox --schema`
 - **THEN** the system returns a JSON command syntax validation error and does not query a project database
+
+### Requirement: Maintenance command JSON responses
+
+Successful root maintenance commands SHALL write exactly one JSON object to
+stdout. `dbox backup` SHALL identify the created backup file, and `dbox doctor`
+SHALL report database existence, opening status, SQLite integrity status,
+pending known migrations, and inspected permissions. Neither command SHALL
+write diagnostics or auxiliary text outside its JSON response.
+
+#### Scenario: Return a backup result
+
+- **WHEN** `dbox backup` successfully creates a backup
+- **THEN** stdout contains exactly one JSON object that identifies the created backup file
+
+#### Scenario: Return a doctor diagnostic result
+
+- **WHEN** `dbox doctor` completes its read-only diagnostic checks
+- **THEN** stdout contains exactly one JSON object with the documented maintenance diagnostic fields
 
 ### Requirement: Selectable successful output
 

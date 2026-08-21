@@ -53,16 +53,20 @@ almacenamiento compartido por defecto.
 ### Jerarquia de comandos
 
 La raiz de `dbox` contiene exclusivamente operaciones de infraestructura
-compartida y los grupos de catalogos disponibles. `init` es la unica operacion
-de infraestructura del MVP: crea la base local del proyecto y aplica todas las
-migraciones conocidas por la version instalada, incluidas las tablas de
-cualquier catalogo futuro.
+compartida y los grupos de catalogos disponibles. `init` crea la base local del
+proyecto y aplica todas las migraciones conocidas por la version instalada,
+incluidas las tablas de cualquier catalogo futuro. `context`, `backup` y
+`doctor` son operaciones de infraestructura no migratorias: inspeccionan el
+contexto o preservan y diagnostican una base existente sin aplicar migraciones.
 
 Las operaciones especificas de datos y contrato viven dentro de su catalogo:
 
 ```text
 dbox
 ├── init
+├── context
+├── backup
+├── doctor
 └── activity
     ├── schema
     ├── add
@@ -228,11 +232,12 @@ La implementacion usara:
 - EF Core migrations generadas mediante `dotnet ef`;
 - `xUnit` para las pruebas automatizadas.
 
-La aplicacion no tendra una referencia directa a `Microsoft.Data.Sqlite` ni
-usara `SqliteConnection`, `SqliteCommand` o SQL CRUD escrito a mano. El
-proveedor `Microsoft.EntityFrameworkCore.Sqlite` puede depender
-transitivamente de `Microsoft.Data.Sqlite`; esa dependencia es un detalle
-interno del proveedor y no forma parte de la API ni del codigo de `dbox`.
+La aplicacion no usara `Microsoft.Data.Sqlite`, `SqliteConnection`,
+`SqliteCommand` ni SQL CRUD escrito a mano para leer o modificar el catalogo.
+El componente aislado de mantenimiento puede referenciar directamente
+`Microsoft.Data.Sqlite` unicamente para `BackupDatabase` y
+`PRAGMA integrity_check`; esa excepcion no forma parte de la API de datos ni se
+extiende a `activity` u otros catalogos.
 
 No se utilizara Entity Framework Core para introducir repositorios genericos,
 unit of work propios, DI compleja ni capas adicionales. Se usara un
