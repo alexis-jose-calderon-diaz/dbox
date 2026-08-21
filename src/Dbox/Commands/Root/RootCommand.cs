@@ -3,6 +3,7 @@ using CommandRoot = System.CommandLine.RootCommand;
 using Dbox.Cli;
 using Dbox.Commands.Activity;
 using Dbox.Commands.Context;
+using Dbox.Commands.Doctor;
 using Dbox.Commands.Init;
 
 namespace Dbox.Commands.Root;
@@ -22,6 +23,8 @@ public static class RootCommand
 
         root.Add(InitCommand.Create(context));
         root.Add(ContextCommand.Create(context));
+        root.Add(BackupCommand.Create(context));
+        root.Add(DoctorCommand.Create(context));
         root.Add(ActivityCommand.Create(context));
         return root;
     }

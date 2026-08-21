@@ -10,6 +10,7 @@ public sealed class CommandContext
         OutputWriter writer,
         DboxLocator locator,
         DboxDatabase database,
+        DboxDatabaseMaintenance databaseMaintenance,
         ActivityRepository activityRepository,
         Func<string> currentDirectoryProvider)
     {
@@ -17,6 +18,7 @@ public sealed class CommandContext
         Executor = new CommandExecutor(writer);
         Locator = locator;
         Database = database;
+        DatabaseMaintenance = databaseMaintenance;
         ActivityRepository = activityRepository;
         CurrentDirectoryProvider = currentDirectoryProvider;
     }
@@ -28,6 +30,8 @@ public sealed class CommandContext
     public DboxLocator Locator { get; }
 
     public DboxDatabase Database { get; }
+
+    public DboxDatabaseMaintenance DatabaseMaintenance { get; }
 
     public ActivityRepository ActivityRepository { get; }
 

@@ -8,12 +8,23 @@ public sealed class DboxDbContextFactory : IDesignTimeDbContextFactory<DboxDbCon
 {
     public DboxDbContext CreateDbContext(string[] args) => Create(":memory:");
 
-    public DboxDbContext Create(string databasePath)
+    public DboxDbContext Create(string databasePath) => Create(databasePath, readOnly: false);
+
+    public DboxDbContext CreateReadOnly(string databasePath) => Create(databasePath, readOnly: true);
+
+    private static DboxDbContext Create(string databasePath, bool readOnly)
     {
         var connectionString = new DbConnectionStringBuilder
         {
             ["Data Source"] = databasePath
         }.ConnectionString;
+        if (readOnly)
+        {
+            var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+            builder["Mode"] = "ReadOnly";
+            connectionString = builder.ConnectionString;
+        }
+
         var options = new DbContextOptionsBuilder<DboxDbContext>()
             .UseSqlite(connectionString)
             .Options;

@@ -44,10 +44,12 @@ public static class DboxCli
     {
         var locator = new DboxLocator();
         var contextFactory = new DboxDbContextFactory();
+        var database = new DboxDatabase(locator, contextFactory);
         var context = new CommandContext(
             writer,
             locator,
-            new DboxDatabase(locator, contextFactory),
+            database,
+            new DboxDatabaseMaintenance(locator, contextFactory),
             new ActivityRepository(),
             currentDirectoryProvider);
         return RootCommandBuilder.Create(context);
