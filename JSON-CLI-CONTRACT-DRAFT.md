@@ -1,8 +1,8 @@
 # Borrador del contrato JSON de dbox
 
-Este documento describe una posible CLI de `dbox` despues de eliminar los
-aliases y las opciones de formato redundantes. No es todavia el contrato
-oficial del proyecto.
+Este documento describe el contrato JSON implementado por `dbox` despues de
+eliminar los aliases y las opciones de formato redundantes. Se mantiene como
+borrador documental hasta su incorporacion al contrato oficial del proyecto.
 
 La propuesta usa los nombres de los comandos como selectores textuales y usa
 JSON como formato de salida y de los payloads:
@@ -14,7 +14,9 @@ comando + --json '{...}' -> comando -> JSON por stdout
 
 ## Reglas generales
 
-- Toda respuesta exitosa se escribe en `stdout` como un unico valor JSON.
+- Toda respuesta exitosa se escribe en `stdout` como un unico valor JSON,
+  excepto `activity export --format jsonl`, que escribe un objeto JSON compacto
+  por linea y no escribe nada cuando el catalogo esta vacio.
 - Todo error esperado se escribe en `stderr` como un unico objeto JSON.
 - `--json '<objeto>'` y `--json-file <path>` son fuentes JSON alternativas y
   mutuamente excluyentes.
@@ -22,6 +24,14 @@ comando + --json '{...}' -> comando -> JSON por stdout
   UTF-8.
 - Una fuente JSON es obligatoria en `add` y `update` y opcional en `list` y
   `count`; si se omite en estos ultimos, no hay filtros.
+- `update` exige una propiedad `version` positiva como precondicion de
+  concurrencia; `version` no es un campo modificable.
+- `updated_at` y `version` son campos generados y aparecen en cada respuesta
+  completa de actividad.
+- `activity export` usa JSON por defecto o JSONL cuando se solicita
+  explicitamente con `--format`.
+- `activity import` exige `--file` y `--format`; no lee desde `stdin`, no
+  autodetecta el formato y conserva todos los campos del registro exportado.
 - No existen `--output text` ni `--output json`.
 - No existen aliases de comandos.
 - `add`, `list`, `count` y `update` reciben su payload mediante `--json` o
@@ -35,10 +45,13 @@ comando + --json '{...}' -> comando -> JSON por stdout
   combinan `--dry-run` y `--yes`, prevalece `--dry-run`.
 - La CLI no lee payloads desde `stdin` de forma implicita; solo lo hace cuando
   se especifica `--json-file -`.
-- No se aceptan arreglos JSON ni propiedades desconocidas en los payloads.
+- Los payloads ordinarios de `add`, `list`, `count` y `update` deben ser objetos
+  JSON y rechazan propiedades desconocidas. El formato JSON de `import` es,
+  deliberadamente, un arreglo de registros completos.
 - `--help` conserva la ayuda textual natural de una herramienta CLI.
 - `list` ordena siempre por `created_at ASC` y usa `id ASC` como desempate.
-- Los comandos conservan los codigos de salida actuales.
+- Los comandos conservan los codigos de salida actuales; los conflictos usan
+  `3` y los errores de lectura de importacion usan `4`.
 
 ## Resumen de comandos
 
@@ -53,9 +66,11 @@ comando + --json '{...}' -> comando -> JSON por stdout
 | `dbox activity list [--json '{...}' o --json-file <path>]` | Filtros opcionales | Envelope con actividades y paginacion |
 | `dbox activity count [--json '{...}' o --json-file <path>]` | Filtros opcionales | Objeto con `count` |
 | `dbox activity get 15` | ID posicional | Actividad solicitada |
-| `dbox activity update 15 --json '{...}'` o `--json-file <path>` | Campos modificables | Actividad actualizada |
+| `dbox activity update 15 --json '{...}'` o `--json-file <path>` | Version esperada y campos modificables | Actividad actualizada |
 | `dbox activity delete 15 --yes` | ID y confirmacion | Confirmacion de borrado |
 | `dbox activity delete 15 --dry-run` | ID y previsualizacion | Actividad a eliminar |
+| `dbox activity export [--format json\|jsonl]` | Formato opcional | Arreglo JSON o registros JSONL |
+| `dbox activity import --file <path> --format <json\|jsonl>` | Archivo y formato | Objeto con conteo y formato |
 
 ## Ayuda
 
@@ -169,6 +184,8 @@ Commands:
   get                  Get one activity by ID.
   update               Update an activity by ID.
   delete               Delete an activity by ID.
+  export               Export all activities.
+  import               Import complete activities.
 
 Options:
   --help               Show command line help.
@@ -199,7 +216,8 @@ Options:
 a `--json`. `list --help` muestra `--json-file`, `--skip`, `--take` y `--all`.
 `get`, `update` y `delete` muestran que el ID es un argumento posicional.
 `delete --help` tambien muestra `--yes` y `--dry-run`. Los detalles de campos y
-enums se descubren con `dbox activity schema`.
+enums se descubren con `dbox activity schema`. `export --help` muestra
+`--format`; `import --help` muestra `--file` y `--format`.
 
 Ejemplo de ayuda de `list`:
 
@@ -221,6 +239,43 @@ Options:
   --take <take>            Maximum number of records to return. Defaults to 100.
   --all                    Return all matching records without a limit.
   --help                   Show command line help.
+```
+
+### Ayuda de `export`
+
+```bash
+dbox activity export --help
+```
+
+```text
+Description:
+  Export all activities.
+
+Usage:
+  dbox activity export [options]
+
+Options:
+  --format <format>  Portable format: json (default) or jsonl.
+  --help             Show command line help.
+```
+
+### Ayuda de `import`
+
+```bash
+dbox activity import --help
+```
+
+```text
+Description:
+  Import complete activities.
+
+Usage:
+  dbox activity import [options]
+
+Options:
+  --file <file>      Path to a UTF-8 JSON or JSONL export file.
+  --format <format>  Portable format: json or jsonl.
+  --help             Show command line help.
 ```
 
 Ejemplo de ayuda de `delete`:
@@ -406,6 +461,8 @@ Si no se encuentra una base de proyecto, `doctor` devuelve el error
 ### `dbox activity schema`
 
 El comando canonico es `activity schema`. No existe `activity --schema`.
+`activity schema` no necesita una base de proyecto, no la abre y no aplica
+migraciones; devuelve el contrato instalado de la CLI directamente.
 
 ```bash
 dbox activity schema
@@ -433,6 +490,23 @@ Respuesta:
           "generated": true,
           "mutable": false,
           "description": "Fecha y hora UTC generada al crear la actividad."
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "required": false,
+          "generated": true,
+          "mutable": false,
+          "description": "Fecha y hora UTC de la ultima modificacion exitosa."
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "required": false,
+          "generated": true,
+          "mutable": false,
+          "default": 1,
+          "description": "Version positiva generada para controlar concurrencia."
         },
         "type": {
           "name": "type",
@@ -560,6 +634,8 @@ Respuesta:
 {
   "id": 15,
   "created_at": "2026-08-20T11:30:00Z",
+  "updated_at": "2026-08-20T11:30:00Z",
+  "version": 1,
   "type": "implementation",
   "title": "Implementar refresh token",
   "description": "Agrega soporte de refresh token",
@@ -590,9 +666,12 @@ Reglas de entrada:
 - `effort` debe ser `low`, `medium`, `high` o `very-high`.
 - `reference` y `metadata` son opcionales; `metadata` debe ser un objeto JSON o
   `null`.
-- `id` y `created_at` no se aceptan porque son generados.
+- `id`, `created_at`, `updated_at` y `version` no se aceptan porque son
+  generados.
 - Las propiedades desconocidas se rechazan.
 - `--json` y `--json-file` no pueden usarse juntos.
+- `created_at` y `updated_at` se generan como timestamps UTC con sufijo `Z`;
+  ambos tienen el mismo valor al crear y `version` comienza en `1`.
 
 ## Listar y filtrar actividades
 
@@ -613,6 +692,8 @@ Respuesta:
     {
       "id": 15,
       "created_at": "2026-08-20T11:30:00Z",
+      "updated_at": "2026-08-20T11:30:00Z",
+      "version": 1,
       "type": "implementation",
       "title": "Implementar refresh token",
       "description": "Agrega soporte de refresh token",
@@ -652,6 +733,8 @@ Respuesta:
     {
       "id": 16,
       "created_at": "2026-08-20T11:31:00Z",
+      "updated_at": "2026-08-20T11:31:00Z",
+      "version": 1,
       "type": "research",
       "title": "Evaluar cache",
       "description": "Comparar opciones",
@@ -688,6 +771,8 @@ Respuesta:
     {
       "id": 15,
       "created_at": "2026-08-20T11:30:00Z",
+      "updated_at": "2026-08-20T11:30:00Z",
+      "version": 1,
       "type": "implementation",
       "title": "Implementar refresh token",
       "description": "Agrega soporte de refresh token",
@@ -832,6 +917,8 @@ Respuesta:
 {
   "id": 15,
   "created_at": "2026-08-20T11:30:00Z",
+  "updated_at": "2026-08-20T11:30:00Z",
+  "version": 1,
   "type": "implementation",
   "title": "Implementar refresh token",
   "description": "Agrega soporte de refresh token",
@@ -855,7 +942,7 @@ contiene solamente los campos que se desean modificar. Se debe proporcionar
 exactamente una fuente; `--json-file -` lee desde `stdin`.
 
 ```bash
-dbox activity update 15 --json '{"status":"in_progress"}'
+dbox activity update 15 --json '{"status":"in_progress","version":1}'
 ```
 
 Respuesta:
@@ -864,6 +951,8 @@ Respuesta:
 {
   "id": 15,
   "created_at": "2026-08-20T11:30:00Z",
+  "updated_at": "2026-08-20T11:31:00Z",
+  "version": 2,
   "type": "implementation",
   "title": "Implementar refresh token",
   "description": "Agrega soporte de refresh token",
@@ -882,14 +971,14 @@ Actualizacion parcial de varios campos:
 
 ```bash
 dbox activity update 15 \
-  --json '{"title":"Implementar refresh token con cookie","description":"Cookie HttpOnly"}'
+  --json '{"title":"Implementar refresh token con cookie","description":"Cookie HttpOnly","version":2}'
 ```
 
 Actualizar desde un archivo o limpiar un campo opcional:
 
 ```bash
 dbox activity update 15 --json-file update.json
-dbox activity update 15 --json '{"reference":null,"metadata":null}'
+dbox activity update 15 --json '{"reference":null,"metadata":null,"version":2}'
 ```
 
 Respuesta:
@@ -898,6 +987,8 @@ Respuesta:
 {
   "id": 15,
   "created_at": "2026-08-20T11:30:00Z",
+  "updated_at": "2026-08-20T11:32:00Z",
+  "version": 3,
   "type": "implementation",
   "title": "Implementar refresh token",
   "description": "Cookie HttpOnly",
@@ -916,13 +1007,107 @@ Reglas de entrada:
 
 - Se puede modificar `type`, `title`, `description`, `status`, `source`, `area`,
   `result`, `impact`, `effort`, `reference` y `metadata`.
+- `version` es obligatorio, debe ser un entero positivo y debe coincidir con la
+  version actualmente persistida; funciona como precondicion y no es un campo
+  modificable.
+- Una actualizacion exitosa cambia `updated_at` al timestamp UTC actual e
+  incrementa `version` exactamente en uno.
 - Debe existir al menos un campo modificable en el objeto JSON.
 - Los campos obligatorios no aceptan `null`, texto vacio ni texto formado solo
   por espacios.
 - `reference` y `metadata` pueden recibir `null` para limpiarse.
-- `id` y `created_at` no se aceptan en el objeto JSON.
+- `id`, `created_at` y `updated_at` no se aceptan en el objeto JSON.
 - Las propiedades desconocidas se rechazan.
 - Los campos omitidos conservan su valor anterior.
+
+## Portabilidad de actividades
+
+### Exportar actividades: `dbox activity export [--format json|jsonl]`
+
+`export` aplica las migraciones pendientes antes de leer la base y devuelve el
+catalogo completo ordenado por `created_at ASC` y luego `id ASC`. El formato
+predeterminado es `json`.
+
+```bash
+dbox activity export
+```
+
+La salida JSON es exactamente un arreglo con todos los campos publicos de cada
+actividad, incluidos `id`, `created_at`, `updated_at` y `version`:
+
+```json
+[
+  {
+    "id": 15,
+    "created_at": "2026-08-20T11:30:00Z",
+    "updated_at": "2026-08-20T11:31:00Z",
+    "version": 2,
+    "type": "implementation",
+    "title": "Implementar refresh token",
+    "description": "Agrega soporte de refresh token",
+    "status": "in_progress",
+    "source": "manual",
+    "area": "backend",
+    "result": "El flujo queda disponible",
+    "impact": "Mejora la continuidad de sesion",
+    "effort": "medium",
+    "reference": null,
+    "metadata": null
+  }
+]
+```
+
+Un catalogo vacio se exporta como `[]`.
+
+El formato JSONL se solicita explicitamente:
+
+```bash
+dbox activity export --format jsonl
+```
+
+Escribe un objeto JSON compacto por linea, sin arreglo envolvente, lineas
+vacias, progreso ni resumen. Un catalogo vacio produce `stdout` vacio. Esta es
+la unica operacion exitosa de la CLI que no escribe un unico valor JSON.
+
+### Importar actividades: `dbox activity import --file <path> --format <json|jsonl>`
+
+`import` exige ambas opciones, aplica las migraciones pendientes antes de
+persistir y lee un archivo UTF-8. La ruta relativa se resuelve respecto al
+directorio de trabajo actual. No acepta `stdin`, no autodetecta el formato y no
+admite `--output`.
+
+```bash
+dbox activity import --file activities.json --format json
+dbox activity import --file activities.jsonl --format jsonl
+```
+
+Cada registro importado debe ser completo y contener exactamente estos campos:
+`id`, `created_at`, `updated_at`, `version`, `type`, `title`, `description`,
+`status`, `source`, `area`, `result`, `impact`, `effort`, `reference` y
+`metadata`. `reference` y `metadata` pueden ser `null`, pero sus propiedades no
+se pueden omitir. Los timestamps deben ser UTC ISO 8601 con sufijo `Z`; `id` y
+`version` deben ser enteros positivos.
+
+El formato JSON requiere un unico arreglo. El formato JSONL requiere un objeto
+por cada linea; las lineas vacias se rechazan. Ambos formatos rechazan
+propiedades desconocidas, registros incompletos y valores que incumplan las
+reglas de `activity`. Un archivo JSONL vacio es valido y devuelve
+`{"imported":0,"format":"jsonl"}`.
+
+La CLI valida y parsea todo el archivo antes de iniciar la escritura. La
+importacion se ejecuta en una transaccion serializable: conserva exactamente
+los campos suministrados o no persiste ningun registro. Los IDs no se remapean
+ni se fusionan. Un ID repetido en el archivo o ya existente en la base devuelve
+`conflict_error`.
+
+Respuesta exitosa:
+
+```json
+{
+  "imported": 1,
+  "format": "json"
+}
+```
 
 ## Eliminar una actividad
 
@@ -963,6 +1148,8 @@ Respuesta:
   "activity": {
     "id": 15,
     "created_at": "2026-08-20T11:30:00Z",
+    "updated_at": "2026-08-20T11:30:00Z",
+    "version": 1,
     "type": "implementation",
     "title": "Implementar refresh token",
     "description": "Agrega soporte de refresh token",
@@ -1021,10 +1208,11 @@ Respuesta en `stderr`:
 
 Exit code: `2`.
 
-### Archivo JSON ilegible
+### Archivo JSON de payload ilegible
 
-Un archivo inexistente, inaccesible o que no pueda leerse como UTF-8 devuelve
-un error de validacion determinista.
+Para `--json-file` en `add`, `list`, `count` o `update`, un archivo inexistente,
+inaccesible o que no pueda leerse como UTF-8 devuelve un error de validacion
+determinista.
 
 ```json
 {
@@ -1126,6 +1314,39 @@ Respuesta en `stderr`:
 
 Exit code: `2`.
 
+### Version esperada ausente o invalida
+
+`update` requiere `version` en el objeto JSON y la acepta solo como un entero
+positivo. La ausencia, un valor no entero o una version no positiva se rechazan
+antes de abrir una escritura persistente.
+
+Entrada:
+
+```json
+{
+  "status": "completed"
+}
+```
+
+Respuesta en `stderr`:
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Invalid activity.",
+    "details": [
+      {
+        "field": "version",
+        "message": "Value must be a positive integer version."
+      }
+    ]
+  }
+}
+```
+
+Exit code: `2`.
+
 ### Valor de enum invalido
 
 Entrada:
@@ -1183,6 +1404,46 @@ Respuesta en `stderr` para `get`, `update` o `delete`:
 ```
 
 Exit code: `3`.
+
+### Conflicto de concurrencia o de importacion
+
+Una actualizacion con una `version` obsoleta no sobrescribe la actividad y
+devuelve `conflict_error`. El mismo codigo se usa cuando `import` recibe un ID
+repetido en el archivo o un ID ya existente en la base.
+
+```bash
+dbox activity update 15 --json '{"status":"completed","version":1}'
+```
+
+Respuesta en `stderr`:
+
+```json
+{
+  "error": {
+    "code": "conflict_error",
+    "message": "Activity 15 has a version conflict."
+  }
+}
+```
+
+Exit code: `3`.
+
+### Archivo de importacion ilegible
+
+Cuando `activity import --file <path>` no puede abrir o leer el archivo UTF-8,
+devuelve `io_error`. No se inicia una importacion ni se escribe una respuesta
+exitosa en `stdout`.
+
+```json
+{
+  "error": {
+    "code": "io_error",
+    "message": "Unable to read import file."
+  }
+}
+```
+
+Exit code: `4`.
 
 ### Base no encontrada
 
@@ -1311,8 +1572,8 @@ Las siguientes formas ya no serian validas:
 | `dbox activity list --type research` | `dbox activity list --json '{"type":"research"}'` |
 | `printf '%s' '{...}' \| dbox activity add` | `printf '%s' '{...}' \| dbox activity add --json-file -` |
 | `dbox activity add --type research --title Test` | `dbox activity add --json '{"type":"research","title":"Test"}'` |
-| `printf '%s' '{"status":"completed"}' \| dbox activity update 15` | `printf '%s' '{"status":"completed"}' \| dbox activity update 15 --json-file -` |
-| `dbox activity update 15 --status completed` | `dbox activity update 15 --json '{"status":"completed"}'` |
+| `printf '%s' '{"status":"completed","version":1}' \| dbox activity update 15` | `printf '%s' '{"status":"completed","version":1}' \| dbox activity update 15 --json-file -` |
+| `dbox activity update 15 --status completed` | `dbox activity update 15 --json '{"status":"completed","version":1}'` |
 | `dbox --schema` | `dbox activity schema` |
 | `dbox activity delete 15` | `dbox activity delete 15 --yes` o `dbox activity delete 15 --dry-run` |
 
@@ -1326,8 +1587,8 @@ ninguna operacion sobre la base.
 | `0` | Operacion exitosa |
 | `1` | Error inesperado |
 | `2` | Error de validacion o sintaxis |
-| `3` | Recurso no encontrado |
-| `4` | Base no encontrada o error de base de datos |
+| `3` | Recurso no encontrado o conflicto de concurrencia/importacion |
+| `4` | Base no encontrada, I/O de importacion o error de base de datos |
 
 ## Decisiones incorporadas
 
@@ -1339,5 +1600,11 @@ ninguna operacion sobre la base.
   resultados.
 - `list` calcula `total` sobre la consulta filtrada antes de aplicar
   `skip`/`take`; la respuesta incluye `items` y `pagination`.
+- Las respuestas completas de actividad incluyen `updated_at` y `version`;
+  una actualizacion exige la version esperada y la incrementa al persistir.
+- `export` conserva el orden estable y permite JSON o JSONL; `import` exige
+  registros completos, preserva sus IDs y escribe de forma atomica.
+- `conflict_error` usa exit code `3` para versiones obsoletas y colisiones de
+  IDs; `io_error` usa exit code `4` para archivos de importacion ilegibles.
 - La CLI conserva los comandos textuales (`activity add`, `activity list`, etc.)
   como selectores publicos.
