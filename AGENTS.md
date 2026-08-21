@@ -31,4 +31,26 @@
 
 ## Git
 
-- Manten mensajes de commit semanticos y concisos; el historial inicial usa prefijos convencionales como `docs:` y `chore:`.
+- Manten mensajes de commit semanticos y concisos; el historial inicial usa prefijos convencionales como `docs:` y `chore:` y genera los mensages siempre en español.
+
+## Formato de comandos de terminal
+
+Cuando presentes comandos de terminal que contengan múltiples operaciones encadenadas con `&&`, escribe cada operación en una línea separada.
+
+Mantén `&&` al final de la línea anterior para conservar explícitamente el encadenamiento entre comandos.
+
+### Ejemplo correcto
+
+```bash
+dotnet restore &&
+dotnet build &&
+dotnet test
+```
+
+### Evitar
+
+```bash
+dotnet restore && dotnet build && dotnet test
+```
+
+Aplica esta regla tanto al mostrar comandos al usuario como al proponer comandos que puedan copiarse y ejecutarse directamente.
