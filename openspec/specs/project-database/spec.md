@@ -6,6 +6,29 @@ Define the local, isolated SQLite lifecycle that lets every dbox project own and
 
 ## Requirements
 
+### Requirement: Private Linux project database artifacts
+
+When `dbox init` runs on Linux, the system SHALL set `.dbox` to POSIX mode
+`0700` and `data.db` to POSIX mode `0600`. It SHALL also set any SQLite
+sidecar artifacts created or found for that database, including `-wal`, `-shm`,
+and `-journal` files, to POSIX mode `0600`. On non-Linux systems, the system
+SHALL initialize the project without claiming or reporting POSIX mode values.
+
+#### Scenario: Initialize a new Linux project privately
+
+- **WHEN** `dbox init` creates a project database on Linux
+- **THEN** `.dbox` has mode `0700` and `data.db` has mode `0600` after initialization
+
+#### Scenario: Reinitialize an existing Linux project privately
+
+- **WHEN** `dbox init` runs on Linux against an existing project database or SQLite sidecar artifact with broader permissions
+- **THEN** it preserves the database contents while setting `.dbox` to `0700` and the database and sidecar artifacts to `0600`
+
+#### Scenario: Initialize on a non-Linux system
+
+- **WHEN** `dbox init` runs on a non-Linux system
+- **THEN** it completes the documented initialization behavior without returning or promising POSIX permission modes
+
 ### Requirement: Project-local initialization
 
 The system SHALL initialize only the current working directory when the user runs `dbox init`. This root command is shared infrastructure for every current and future catalog and SHALL apply all migrations known to the installed CLI.
@@ -32,7 +55,11 @@ The system SHALL initialize only the current working directory when the user run
 
 ### Requirement: Nearest project database discovery
 
-Every command except `init` SHALL resolve the first `.dbox` directory found while walking from the current directory toward the filesystem root and SHALL use its `data.db` file.
+Every command that requires a project database SHALL resolve the first `.dbox`
+directory found while walking from the current directory toward the filesystem
+root and SHALL use its `data.db` file. `dbox context` SHALL perform the same
+walk to report its result without requiring the file to exist. `dbox activity
+schema` SHALL not perform this discovery.
 
 #### Scenario: Discover a database in a parent
 
@@ -56,11 +83,14 @@ Every command except `init` SHALL resolve the first `.dbox` directory found whil
 
 ### Requirement: Automatic migration before data operations
 
-Every catalog command that resolves a project database SHALL apply pending known migrations before its main operation, including `dbox activity schema` and every `dbox activity` data command.
+Every catalog command that resolves a project database to execute a data
+operation SHALL apply pending known migrations before its main operation. This
+includes every persistent `dbox activity` data command, but excludes `dbox
+activity schema` and `dbox activity delete --dry-run`.
 
 #### Scenario: Run a command against a database with pending migrations
 
-- **WHEN** a command resolves a database that has pending known migrations
+- **WHEN** a catalog data operation that is not a dry run resolves a database that has pending known migrations
 - **THEN** the migrations are applied before the requested operation reads or changes data
 
 #### Scenario: Migration fails

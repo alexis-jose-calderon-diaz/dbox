@@ -8,12 +8,15 @@ Define stable command-line output, error, alias, and exit-code behavior so peopl
 
 ### Requirement: Root infrastructure and catalog hierarchy
 
-The root `dbox` command SHALL expose only shared infrastructure operations and available catalog groups. `init` SHALL remain a root operation, and `activity` SHALL be the available catalog group. Catalog-specific operations SHALL NOT be exposed directly at the root.
+The root `dbox` command SHALL expose only shared infrastructure operations and
+available catalog groups. `init` and `context` SHALL be root infrastructure
+operations, and `activity` SHALL be the available catalog group. Catalog-specific
+operations SHALL NOT be exposed directly at the root.
 
 #### Scenario: Discover root operations
 
 - **WHEN** a user requests root help
-- **THEN** the help presents `init` and the `activity` catalog group, and does not present activity CRUD or schema commands as root commands
+- **THEN** the help presents `init`, `context`, and the `activity` catalog group, and does not present activity CRUD or schema commands as root commands
 
 #### Scenario: Reject a removed flat activity command
 
