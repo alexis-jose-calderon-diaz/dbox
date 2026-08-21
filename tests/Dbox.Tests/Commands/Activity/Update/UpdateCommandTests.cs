@@ -24,7 +24,7 @@ public sealed class UpdateCommandTests
             "update",
             "1",
             "--json",
-            "{\"description\":\"Updated details\",\"result\":\"Updated result\",\"status\":\"completed\",\"reference\":null,\"metadata\":null}");
+            "{\"description\":\"Updated details\",\"result\":\"Updated result\",\"status\":\"completed\",\"reference\":null,\"metadata\":null,\"version\":1}");
         var get = await TestProject.RunAsync(project.Root, "activity", "get", "1");
         var emptyUpdate = await TestProject.RunAsync(project.Root, "activity", "update", "1");
         var optionUpdate = await TestProject.RunAsync(

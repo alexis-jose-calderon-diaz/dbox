@@ -29,7 +29,7 @@ public sealed class ActivityJsonInputTests
             "-");
 
         var updatePath = Path.Combine(project.Root, "update.json");
-        File.WriteAllText(updatePath, "{\"title\":\"Updated from file\"}");
+        File.WriteAllText(updatePath, "{\"title\":\"Updated from file\",\"version\":1}");
         var updateFromFile = await TestProject.RunAsync(
             project.Root,
             "activity",
@@ -39,7 +39,7 @@ public sealed class ActivityJsonInputTests
             updatePath);
         var updateFromStdin = await TestProject.RunWithInputAsync(
             project.Root,
-            "{\"status\":\"completed\"}",
+            "{\"status\":\"completed\",\"version\":1}",
             "activity",
             "update",
             "2",

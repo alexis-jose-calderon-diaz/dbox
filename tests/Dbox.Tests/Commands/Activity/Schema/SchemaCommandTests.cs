@@ -23,7 +23,7 @@ public sealed class SchemaCommandTests
         Assert.Empty(formatOption.Output);
         Assert.Contains("validation_error", alias.Error);
         Assert.Contains("validation_error", formatOption.Error);
-        Assert.Equal(13, fields.EnumerateObject().Count());
+        Assert.Equal(15, fields.EnumerateObject().Count());
         Assert.Equal("id", fields.GetProperty("id").GetProperty("name").GetString());
         Assert.Equal("integer", fields.GetProperty("id").GetProperty("type").GetString());
         Assert.Equal(200, fields.GetProperty("title").GetProperty("maxLength").GetInt32());
@@ -32,6 +32,11 @@ public sealed class SchemaCommandTests
         Assert.False(fields.GetProperty("id").GetProperty("mutable").GetBoolean());
         Assert.False(fields.GetProperty("created_at").GetProperty("required").GetBoolean());
         Assert.True(fields.GetProperty("created_at").GetProperty("generated").GetBoolean());
+        Assert.False(fields.GetProperty("updated_at").GetProperty("required").GetBoolean());
+        Assert.True(fields.GetProperty("updated_at").GetProperty("generated").GetBoolean());
+        Assert.Equal("integer", fields.GetProperty("version").GetProperty("type").GetString());
+        Assert.False(fields.GetProperty("version").GetProperty("mutable").GetBoolean());
+        Assert.Equal(1, fields.GetProperty("version").GetProperty("default").GetInt64());
         Assert.True(fields.GetProperty("description").GetProperty("required").GetBoolean());
         Assert.Equal("Descripcion de lo realizado.", fields.GetProperty("description").GetProperty("description").GetString());
         Assert.False(fields.GetProperty("type").TryGetProperty("enum", out _));
